@@ -7,7 +7,7 @@
 <p><b>Your favorite Apple aerials on rotation, without macOS downloading all 160.</b></p>
 
 <p>macOS Shuffle quietly downloads every aerial video, up to 1.5 GB each.<br>
-Aerial Shelf downloads only the ones you pick and rotates just those. Free, for macOS 26 and later.</p>
+Aerial Shelf downloads only the ones you pick and rotates just those. Free, for macOS 26 Tahoe or later.</p>
 
 <p>
   <a href="https://github.com/eddytwist/aerial-shelf/releases/latest/download/AerialShelf.dmg"><img alt="Download for macOS" src="https://img.shields.io/badge/Download_for_macOS-AerialShelf.dmg-0A84FF?style=for-the-badge&logo=apple&logoColor=white"></a>
@@ -61,8 +61,10 @@ Aerial Shelf downloads only the ones you pick and rotates just those. Free, for 
 3. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You do this once.
 4. The library opens and a mountain appears in the menu bar.
 
-Step 3 is there because the app isn't notarized by Apple yet. macOS 26 or later, Apple Silicon and Intel, English and
-Russian.
+Step 3 is there because the app isn't notarized by Apple yet.
+
+**Requirements:** macOS 26 Tahoe or later, Apple Silicon or Intel. macOS 14 and 15 keep aerials in a different place
+and download them with a different system service, so Aerial Shelf doesn't run there. English and Russian.
 
 ## FAQ
 
