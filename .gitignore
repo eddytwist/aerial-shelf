@@ -6,9 +6,3 @@ build/
 *.xcodeproj
 DerivedData/
 .DS_Store
-
-# Local notes, not part of the project
-internal/
-docs/*.html
-design/
-ads/

@@ -63,7 +63,7 @@ Aerial Shelf downloads only the ones you pick and rotates just those. Free, for 
 
 Step 3 is there because the app isn't notarized by Apple yet.
 
-**Requirements:** macOS 26 Tahoe or later, Apple Silicon or Intel. English and Russian.
+**Requirements:** macOS 26 Tahoe or later, Apple Silicon or Intel. App in English and Russian.
 
 ## FAQ
 
