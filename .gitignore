@@ -1,0 +1,14 @@
+.build/
+.build-x86_64/
+build/
+.backups/
+.swiftpm/
+*.xcodeproj
+DerivedData/
+.DS_Store
+
+# Local notes, not part of the project
+internal/
+docs/*.html
+design/
+ads/
