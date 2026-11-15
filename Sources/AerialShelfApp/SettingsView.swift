@@ -106,6 +106,7 @@ struct SettingsView: View {
         .onAppear {
             model.refresh()
             SettingsWindowTitle.apply()
+            SettingsOpener.bringToFront()
         }
         .onChange(of: model.language) { SettingsWindowTitle.apply() }
         .confirmationDialog(L.t("Move %@ to the Trash?", L.videos(model.keptVideosToTrash.count)), isPresented: $askingTrashKept) {
@@ -143,11 +144,14 @@ struct SettingsView: View {
 @MainActor
 enum SettingsWindowTitle {
     static func apply() {
-        DispatchQueue.main.async {
-            let title = L.t("%@ Settings", AppInfo.name)
-            for window in NSApp.windows where window.identifier?.rawValue.contains("Settings") == true || window.title.contains(AppInfo.name) {
-                if window.frame.width < 700 { window.title = title }
-            }
+        DispatchQueue.main.async { window?.title = L.t("%@ Settings", AppInfo.name) }
+    }
+
+    /// The Settings window: the app's only small titled window (the library is wider than 700 points).
+    static var window: NSWindow? {
+        NSApp.windows.first { window in
+            (window.identifier?.rawValue.contains("Settings") == true || window.title.contains(AppInfo.name))
+                && window.frame.width < 700 && window.styleMask.contains(.titled)
         }
     }
 }

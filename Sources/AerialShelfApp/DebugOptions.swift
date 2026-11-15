@@ -8,6 +8,7 @@ import AppKit
 ///                                  (the first playlist) or a category ID such as AerialCategoryLandscapes
 ///     -OpenSettingsAtLaunch YES    open Settings at launch
 ///     -OpenMenuAtLaunch YES        open the menu bar menu two seconds after launch
+///     -SettingsFromMenuAtLaunch YES  three seconds after launch, open Settings the way the menu's Settings… does
 ///     -LibraryAtTopRight YES       put the library under the menu bar menu
 ///     -ForceAppearance dark|light  force an appearance
 ///     -DebugRotateEverySeconds 40  rotate every N seconds instead of the chosen interval
@@ -31,6 +32,12 @@ enum DebugOptions {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
                 model.importVideos(urls)
+            }
+        }
+        if defaults.bool(forKey: "SettingsFromMenuAtLaunch") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                SettingsOpener.open()
             }
         }
         if defaults.bool(forKey: "OpenMenuAtLaunch") {

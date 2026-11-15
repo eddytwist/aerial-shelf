@@ -83,7 +83,7 @@ struct MenuContent: View {
 
         Button(L.t("Open Library")) { openLibrary() }
             .keyboardShortcut("l")
-        SettingsLink { Text(L.t("Settings…")) }
+        Button(L.t("Settings…")) { SettingsOpener.open() }
             .keyboardShortcut(",")
 
         Divider()
@@ -96,6 +96,7 @@ struct MenuContent: View {
         LibraryOpener.openAction = { openWindow(id: "library") }
         openWindow(id: "library")
         NSApp.activate()
+        LibraryOpener.bringToFront()
     }
 
     private func modeTitle(_ mode: RotationMode) -> String {

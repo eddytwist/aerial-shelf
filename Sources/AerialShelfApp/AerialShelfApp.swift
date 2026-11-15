@@ -78,19 +78,62 @@ enum LibraryOpener {
     static func open() {
         openAction?()
         NSApp.activate()
+        bringToFront()
+    }
+
+    /// Raises the library in front of other apps' windows even when macOS doesn't let the app activate.
+    static func bringToFront() {
+        for delay in [0.0, 0.25] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let window = NSApp.windows.first(where: { $0.frame.width > 700 && $0.styleMask.contains(.titled) }) else { return }
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+            }
+        }
+    }
+}
+
+/// Opens Settings in front of other apps' windows. A menu bar app isn't active when its menu is used,
+/// so `SettingsLink` alone opens the window behind whatever app is in front.
+@MainActor
+enum SettingsOpener {
+    static var openAction: (() -> Void)?
+
+    static func open() {
+        openAction?()
+        NSApp.activate()
+        bringToFront()
+    }
+
+    /// Raises the Settings window once it exists (it is created asynchronously the first time).
+    static func bringToFront() {
+        for delay in [0.0, 0.25] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let window = SettingsWindowTitle.window else { return }
+                NSApp.activate()
+                window.makeKeyAndOrderFront(nil)
+                // macOS may refuse to activate the app (it allows that only right after the user acts on it);
+                // the window still comes in front of other apps' windows.
+                window.orderFrontRegardless()
+            }
+        }
     }
 }
 
 /// The menu bar label. It appears at launch, before any window, so it also gives
-/// Finder and Spotlight reopens a way to open the library.
+/// Finder and Spotlight reopens a way to open the library, and the menu a way to open Settings.
 struct MenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     let attention: Bool
 
     var body: some View {
         Image(nsImage: MenuBarIcon.image(attention: attention))
             .accessibilityLabel(AppInfo.name)
-            .onAppear { LibraryOpener.openAction = { openWindow(id: "library") } }
+            .onAppear {
+                LibraryOpener.openAction = { openWindow(id: "library") }
+                SettingsOpener.openAction = { openSettings() }
+            }
     }
 }
 
