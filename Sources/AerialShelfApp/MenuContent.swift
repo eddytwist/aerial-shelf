@@ -21,6 +21,9 @@ struct MenuContent: View {
         Button(L.t("Next Video")) { Task { await model.next() } }
             .keyboardShortcut("n")
             .disabled(!model.canAdvance)
+        if model.streamTarget != nil {
+            Button(L.t("Cancel Download")) { model.cancelStreamDownload() }
+        }
         if model.state.paused {
             Button(L.t("Resume Rotation")) { Task { await model.resumeRotation() } }
         } else if model.state.mode.rotates {
@@ -32,6 +35,9 @@ struct MenuContent: View {
         Menu(L.t("Rotate: %@", modeTitle(model.state.mode))) {
             Picker(selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
                 Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
+                if model.state.streaming || model.state.mode == .allAerials {
+                    Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
+                }
                 ForEach(model.state.playlists) { playlist in
                     Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id))))
                         .tag(RotationMode.playlist(playlist.id))
@@ -95,6 +101,7 @@ struct MenuContent: View {
     private func modeTitle(_ mode: RotationMode) -> String {
         switch mode {
         case .allDownloaded: L.t("All Downloaded")
+        case .allAerials: L.t("All Aerials", context: "mode")
         case .playlist(let id): model.state.playlists.first { $0.id == id }?.name ?? L.t("Playlist")
         case .single: L.t("One Video")
         }

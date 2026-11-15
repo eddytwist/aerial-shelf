@@ -104,7 +104,8 @@ struct LibraryView: View {
                 row(L.t("Downloaded"), "arrow.down.circle.fill", count: model.downloadedAssets.count,
                     rotating: model.state.mode == .allDownloaded)
                     .tag(SidebarItem.downloaded)
-                row(L.t("All Aerials"), "square.grid.2x2.fill", count: model.catalog?.videoAssets.filter { !$0.isCustom }.count ?? 0)
+                row(L.t("All Aerials"), "square.grid.2x2.fill", count: model.catalog?.videoAssets.filter { !$0.isCustom }.count ?? 0,
+                    rotating: model.state.mode == .allAerials)
                     .tag(SidebarItem.all)
                 row(L.t("My Videos"), "film.stack.fill", count: model.custom.videos.count)
                     .tag(SidebarItem.custom)
@@ -319,7 +320,7 @@ struct LibraryView: View {
             ContentUnavailableView {
                 Label(L.t("Empty Playlist"), systemImage: "list.bullet.rectangle")
             } description: {
-                Text(L.t("Drag downloaded videos here, or right-click one and choose Add to Playlist."))
+                Text(L.t("Drag videos here, or right-click one and choose Add to Playlist."))
             }
         } else {
             ContentUnavailableView {
@@ -400,9 +401,15 @@ struct RotationControl: View {
             if model.state.paused {
                 Button(L.t("Resume Rotation")) { Task { await model.resumeRotation() } }
             }
-            if model.isAppleShuffleOn || model.state.paused { Divider() }
+            if model.streamTarget != nil {
+                Button(L.t("Cancel Download")) { model.cancelStreamDownload() }
+            }
+            if model.isAppleShuffleOn || model.state.paused || model.streamTarget != nil { Divider() }
             Picker(L.t("Rotate"), selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
                 Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
+                if model.state.streaming || model.state.mode == .allAerials {
+                    Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
+                }
                 ForEach(model.state.playlists) { playlist in
                     Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id)))).tag(RotationMode.playlist(playlist.id))
                 }

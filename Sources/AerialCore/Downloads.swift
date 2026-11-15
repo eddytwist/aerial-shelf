@@ -5,6 +5,8 @@ public enum DownloadError: Error, Equatable, CustomStringConvertible {
     case untrustedURL(String)
     case notEnoughSpace(needed: Int64, available: Int64)
     case badResponse(Int)
+    /// Low Data Mode is on (or the network is expensive) and the download wasn't allowed to use it.
+    case constrainedNetwork
     case cancelled
     case failed(String)
 
@@ -14,6 +16,7 @@ public enum DownloadError: Error, Equatable, CustomStringConvertible {
         case .untrustedURL(let url): "Refusing to download from \(url): only HTTPS addresses on Apple's servers are allowed"
         case .notEnoughSpace(let needed, let available): "Not enough disk space: \(needed) bytes needed, \(available) available"
         case .badResponse(let code): "Apple's server answered \(code)"
+        case .constrainedNetwork: "Low Data Mode is on, so the download waits for another network"
         case .cancelled: "Download cancelled"
         case .failed(let reason): reason
         }
@@ -32,6 +35,8 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
     private struct Job {
         let assetID: String
         let destination: URL
+        /// The catalog address, written as `SourceURL` (the original request, before any redirect).
+        let source: URL
         let continuation: CheckedContinuation<URL, Error>
         let progress: Progress
         var lastPercent: Int
@@ -53,9 +58,14 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
 
     deinit { session.invalidateAndCancel() }
 
-    func isTrusted(_ url: URL?) -> Bool {
+    func isTrusted(_ url: URL?) -> Bool { Self.isAllowed(url, hostSuffixes: allowedHostSuffixes) }
+
+    /// Whether the default downloader would fetch this address: HTTPS on Apple's domain.
+    public static func isAppleURL(_ url: URL?) -> Bool { isAllowed(url, hostSuffixes: ["apple.com"]) }
+
+    private static func isAllowed(_ url: URL?, hostSuffixes: [String]) -> Bool {
         guard let url, url.scheme == "https", let host = url.host?.lowercased() else { return false }
-        return allowedHostSuffixes.contains { host == $0 || host.hasSuffix("." + $0) }
+        return hostSuffixes.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
     private func trustedURL(for asset: AerialAsset) throws -> URL {
@@ -65,9 +75,11 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
     }
 
     /// Size of the file on Apple's server, without downloading it.
-    public func remoteSize(of asset: AerialAsset) async throws -> Int64 {
+    public func remoteSize(of asset: AerialAsset, allowsConstrainedNetwork: Bool = true) async throws -> Int64 {
         var request = URLRequest(url: try trustedURL(for: asset))
         request.httpMethod = "HEAD"
+        request.allowsConstrainedNetworkAccess = allowsConstrainedNetwork
+        request.allowsExpensiveNetworkAccess = allowsConstrainedNetwork
         // Asked right before the confirmation; don't keep the user waiting on a slow network.
         request.timeoutInterval = 4
         let (_, response) = try await session.data(for: request)
@@ -83,8 +95,12 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
         return values?.volumeAvailableCapacityForImportantUsage
     }
 
-    /// - Parameter expectedSize: when known, the download is refused unless the disk keeps 500 MB free afterwards.
+    /// - Parameters:
+    ///   - expectedSize: when known, the download is refused unless the disk keeps 500 MB free afterwards.
+    ///   - allowsConstrainedNetwork: false for downloads nobody asked for right now (the next video of a streaming
+    ///     rotation): they don't use Low Data Mode or expensive networks and fail with `constrainedNetwork` instead.
     public func download(_ asset: AerialAsset, paths: AerialPaths, expectedSize: Int64? = nil,
+                         allowsConstrainedNetwork: Bool = true,
                          progress: @escaping Progress) async throws -> URL {
         let url = try trustedURL(for: asset)
         if let expectedSize, let available = Self.availableSpace(paths: paths), available < expectedSize + 500_000_000 {
@@ -95,10 +111,13 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
         let assetID = asset.id
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                let task = session.downloadTask(with: url)
+                var request = URLRequest(url: url)
+                request.allowsConstrainedNetworkAccess = allowsConstrainedNetwork
+                request.allowsExpensiveNetworkAccess = allowsConstrainedNetwork
+                let task = session.downloadTask(with: request)
                 lock.withLock {
                     jobs[task.taskIdentifier] = Job(
-                        assetID: assetID, destination: destination, continuation: continuation,
+                        assetID: assetID, destination: destination, source: url, continuation: continuation,
                         progress: progress, lastPercent: -1
                     )
                     tasksByAsset[assetID] = task
@@ -163,9 +182,7 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
             let fm = FileManager.default
             try? fm.removeItem(at: partial)
             try fm.moveItem(at: location, to: partial)
-            if let source = downloadTask.originalRequest?.url?.absoluteString {
-                ExtendedAttributes.set(source, named: "SourceURL", at: partial)
-            }
+            ExtendedAttributes.set(job.source.absoluteString, named: "SourceURL", at: partial)
             if let etag = http.value(forHTTPHeaderField: "ETag") {
                 ExtendedAttributes.set(etag, named: "LastETag", at: partial)
             }
@@ -182,8 +199,16 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let error else { return }
-        let cancelled = (error as? URLError)?.code == .cancelled
-        finish(task, with: .failure(cancelled ? DownloadError.cancelled : DownloadError.failed(error.localizedDescription)))
+        finish(task, with: .failure(Self.downloadError(for: error)))
+    }
+
+    static func downloadError(for error: Error) -> DownloadError {
+        guard let urlError = error as? URLError else { return .failed(error.localizedDescription) }
+        if urlError.code == .cancelled { return .cancelled }
+        if let reason = urlError.networkUnavailableReason, reason == .constrained || reason == .expensive {
+            return .constrainedNetwork
+        }
+        return .failed(urlError.localizedDescription)
     }
 
     private func finish(_ task: URLSessionTask, with result: Result<URL, Error>) {
@@ -196,7 +221,8 @@ public final class AerialDownloader: NSObject, URLSessionDownloadDelegate, @unch
     }
 }
 
-/// Moves a downloaded video to the Trash (never deletes it permanently).
+/// Moves a downloaded video to the Trash (never deletes it permanently). Only streamed copies are deleted for good,
+/// by `StreamCache`.
 public enum VideoTrash {
     @discardableResult
     public static func moveToTrash(assetID: String, paths: AerialPaths) throws -> URL? {

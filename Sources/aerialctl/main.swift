@@ -10,7 +10,8 @@ usage: aerialctl <command> [options]
   status                 current wallpaper, mode and next change
   list [--all]           downloaded videos (or the whole catalog) with safety status
   set <id|name>          set one downloaded video as the wallpaper
-  next                   switch to the next video of the current rotation
+  next                   switch to the next downloaded video of the current rotation
+                         (with Keep Only the Video on Screen on, the app downloads the others)
   download <id|name>     download one video from Apple's server into the macOS folder
   trash <id|name>        move one downloaded video to the Trash
   backup                 save a copy of the wallpaper settings now
@@ -68,6 +69,7 @@ func describe(_ id: String?, _ catalog: Catalog) -> String {
 func modeText(_ mode: RotationMode, _ state: RotationState, _ catalog: Catalog) -> String {
     switch mode {
     case .allDownloaded: "all downloaded"
+    case .allAerials: "all aerials"
     case .playlist(let id): "playlist \(state.playlists.first { $0.id == id }?.name ?? id.uuidString)"
     case .single(let id): "one video: \(describe(id, catalog))"
     }
@@ -134,6 +136,10 @@ case "status":
     print("downloaded: \(local.count == 1 ? "1 video" : "\(local.count) videos"), \(gigabytes(total))")
     print("mode:       \(modeText(state.mode, state, catalog))\(state.paused ? " (paused)" : "")\(state.nextChange() == nil && isSingle(state.mode) ? "" : ", " + intervalText(state.interval))")
     if let next = state.nextChange() { print("next:       \(localTime(next))") }
+    if state.streaming {
+        let streamed = state.streamedIDs.filter { local[$0] != nil }
+        print("storage:    keep only the video on screen (\(streamed.count == 1 ? "1 streamed copy" : "\(streamed.count) streamed copies") on disk)")
+    }
     print("original:   \(BackupStore(paths: paths).hasOriginal ? paths.originalStoreBackup.path : "not saved yet")")
     let custom = CustomLibraryStore(paths: paths).read()
     if !custom.isEmpty || state.customVideosEnabled {
@@ -180,7 +186,9 @@ case "next":
     let current = (try? store.snapshot())?.assetID
     var bag = state.bag
     guard let next = ShuffleBag.next(pool: pool, bag: &bag, current: current) else {
-        fail("nothing to rotate: no downloaded videos in the current mode")
+        fail(state.streaming
+             ? "nothing downloaded to switch to; the app downloads the next video itself when its turn comes"
+             : "nothing to rotate: no downloaded videos in the current mode")
     }
     await switchTo(next, catalog: catalog, local: local, bag: bag)
 

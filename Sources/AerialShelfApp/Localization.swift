@@ -37,6 +37,9 @@ enum L {
 
     static func t(_ key: String) -> String { table[key] ?? key }
 
+    /// The same English text translated differently in another place: looks up `key|context` first.
+    static func t(_ key: String, context: String) -> String { table["\(key)|\(context)"] ?? t(key) }
+
     static func t(_ key: String, _ args: CVarArg...) -> String {
         String(format: t(key), locale: Locale(identifier: language), arguments: args)
     }

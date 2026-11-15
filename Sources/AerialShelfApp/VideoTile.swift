@@ -37,6 +37,11 @@ struct VideoTile: View {
     private var missingCustomFile: Bool { asset.isCustom && !isDownloaded }
     /// Can go on screen now (downloaded, current, and for the user's videos: My Videos are on).
     private var canSet: Bool { model.verdict(asset.id) == .safe }
+    /// With Keep Only the Video on Screen on: can be downloaded and shown now, deleted after its turn.
+    private var canShowStreamed: Bool {
+        guard let catalog = model.catalog, model.state.streaming, needsDownload, progress == nil else { return false }
+        return model.streamTarget == nil && !model.isSwitching && StreamPolicy.isStreamable(asset.id, catalog: catalog, local: model.local)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -69,6 +74,11 @@ struct VideoTile: View {
                         capsule(L.t("Set as Wallpaper"), systemImage: "photo") { setWallpaper() }
                             .padding(.bottom, 10)
                             .transition(.opacity)
+                    } else if hovering, canShowStreamed {
+                        capsule(L.t("Show Now"), systemImage: "photo") { showStreamed() }
+                            .padding(.bottom, 10)
+                            .transition(.opacity)
+                            .help(L.t("Downloads it now and deletes it after its turn"))
                     }
                 }
 
@@ -99,7 +109,8 @@ struct VideoTile: View {
             if model.isInUse(asset.id) { model.moveToTrash(asset.id) } else { askingTrash = true }
         }
         .contextMenu { menu }
-        .modifier(DraggableWhen(enabled: isDownloaded, id: asset.id))
+        // Any video can go into a playlist; with Keep Only the Video on Screen on it is downloaded for its turn.
+        .modifier(DraggableWhen(enabled: !missingCustomFile, id: asset.id))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
@@ -220,6 +231,7 @@ struct VideoTile: View {
         } else if missingCustomFile {
             Button(L.t("Remove from My Videos…")) { askingRemove = true }
         } else if needsDownload {
+            if canShowStreamed { Button(L.t("Show Now")) { showStreamed() } }
             Button(outdated ? L.t("Download Again…") : L.t("Download…")) { startDownload() }
         } else if canSet, !isCurrent {
             Button(L.t("Set as Wallpaper")) { setWallpaper() }
@@ -237,6 +249,16 @@ struct VideoTile: View {
                 .disabled(isCurrent || !canSet)
             Button(L.t("Only This Video")) { Task { await model.setMode(.single(asset.id)) } }
                 .disabled(!canSet)
+        } else if progress != nil {
+            Button(L.t("Cancel Download")) { model.cancelDownload(asset.id) }
+        } else if needsDownload {
+            if model.state.streaming {
+                Button(L.t("Show Now")) { showStreamed() }
+                    .disabled(!canShowStreamed)
+            }
+            Button(outdated ? L.t("Download Again…") : L.t("Download…")) { startDownload() }
+        }
+        if !missingCustomFile {
             Divider()
             Menu(L.t("Add to Playlist")) {
                 ForEach(model.state.playlists) { playlist in
@@ -246,10 +268,10 @@ struct VideoTile: View {
                 if !model.state.playlists.isEmpty { Divider() }
                 Button(L.t("New Playlist")) { model.createPlaylist(named: model.name(asset), with: [asset.id]) }
             }
-        } else if progress != nil {
-            Button(L.t("Cancel Download")) { model.cancelDownload(asset.id) }
-        } else if needsDownload {
-            Button(outdated ? L.t("Download Again…") : L.t("Download…")) { startDownload() }
+        }
+        if isDownloaded, model.isStreamed(asset.id) {
+            Button(L.t("Keep Downloaded")) { model.keepStreamed(asset.id) }
+                .help(L.t("Keeps this video after its turn instead of deleting it"))
         }
         if let playlistID {
             Button(L.t("Remove from Playlist")) { model.remove(asset.id, from: playlistID) }
@@ -269,6 +291,8 @@ struct VideoTile: View {
     }
 
     private func setWallpaper() { Task { await model.setWallpaper(asset.id, fromWindow: true) } }
+
+    private func showStreamed() { Task { await model.showStreamed(asset.id) } }
 
     private func pictureAction() {
         if progress != nil { return }

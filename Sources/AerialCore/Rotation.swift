@@ -22,6 +22,9 @@ public enum RotationMode: Codable, Hashable, Sendable {
     case playlist(UUID)
     /// One fixed video, no rotation.
     case single(String)
+    /// Random order over Apple's whole catalog (not the user's own videos). Meant for streaming: then each
+    /// video is downloaded for its turn; without streaming it rotates the downloaded ones, like `allDownloaded`.
+    case allAerials
 }
 
 public struct Playlist: Codable, Identifiable, Hashable, Sendable {
@@ -73,6 +76,13 @@ public struct RotationState: Codable, Equatable, Sendable {
     public var knownVideosSeeded = false
     /// The user agreed to show their own videos in macOS (see `CatalogOverride`).
     public var customVideosEnabled = false
+    /// "Keep only the video on screen": the rotation downloads each video right before its turn and deletes
+    /// the streamed copy it replaced (see `StreamPolicy`). Off by default.
+    public var streaming = false
+    /// Videos downloaded for streaming that aren't the user's to keep: deleted once nothing uses them.
+    public var streamedIDs: [String] = []
+    /// Size of every video streaming has downloaded, for "space saved" (the ones not on disk now).
+    public var streamedSizes: [String: Int64] = [:]
     /// Keys that were in the file but could not be read (not saved). `StateStore` keeps a copy of such a file.
     public var unreadableKeys: [String] = []
 
@@ -80,7 +90,7 @@ public struct RotationState: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case mode, interval, paused, playlists, bag, lastChange, lastAssetID, knownVideoIDs, knownVideosSeeded
-        case customVideosEnabled
+        case customVideosEnabled, streaming, streamedIDs, streamedSizes
         case language = "uiLanguage"
     }
 
@@ -119,6 +129,9 @@ public struct RotationState: Codable, Equatable, Sendable {
         knownVideoIDs = read([String].self, .knownVideoIDs) ?? defaults.knownVideoIDs
         knownVideosSeeded = read(Bool.self, .knownVideosSeeded) ?? !knownVideoIDs.isEmpty
         customVideosEnabled = read(Bool.self, .customVideosEnabled) ?? false
+        streaming = read(Bool.self, .streaming) ?? false
+        streamedIDs = read([String].self, .streamedIDs) ?? []
+        streamedSizes = read([String: Int64].self, .streamedSizes) ?? [:]
         unreadableKeys = unreadable
     }
 

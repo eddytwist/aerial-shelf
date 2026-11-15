@@ -38,7 +38,7 @@
 "Downloading %@ · %ld%%" = "Загрузка: %@ · %ld %%";
 "Downloading… %ld%%" = "Загрузка… %ld %%";
 "Download…" = "Загрузить…";
-"Drag downloaded videos here, or right-click one and choose Add to Playlist." = "Перетащите сюда загруженные видео или нажмите на видео правой кнопкой и выберите «Добавить в плейлист».";
+"Drag videos here, or right-click one and choose Add to Playlist." = "Перетащите сюда видео или нажмите на видео правой кнопкой и выберите «Добавить в плейлист».";
 "Empty Playlist" = "Плейлист пуст";
 "Every 12 Hours" = "Каждые 12 часов";
 "Every 2 Days" = "Каждые 2 дня";
@@ -176,3 +176,28 @@
 "macOS can’t play “%@”." = "macOS не может воспроизвести «%@».";
 "macOS didn’t show “%@”. My Videos may not work with this macOS version; Apple’s videos aren’t affected. Rotation is paused." = "macOS не показала «%@». Возможно, мои видео не работают в этой версии macOS; видео Apple это не затрагивает. Смена приостановлена.";
 "System Language" = "Язык системы";
+
+/* Keep Only the Video on Screen (streaming). Low Data Mode = «Экономия трафика», Low Power Mode = «Режим энергосбережения», as in macOS. */
+"Keep Only the Video on Screen" = "Хранить только видео на экране";
+"Space Saved" = "Сэкономлено";
+"Downloaded by You" = "Загружено вами";
+"Move %@ to the Trash?" = "Переместить %@ в Корзину?";
+"Can’t check which videos are in use, so they stay." = "Не удаётся проверить, какие видео используются, поэтому они остаются.";
+"Couldn’t move %@ to the Trash." = "Не удалось переместить в Корзину: %@.";
+"Downloading next video · %ld%%" = "Загрузка следующего видео · %ld %%";
+"Next video waits: Low Data Mode is on" = "Следующее видео ждёт: включена экономия трафика";
+"Next video waits: not enough disk space" = "Следующее видео ждёт: мало места на диске";
+"No videos in this playlist" = "В плейлисте нет видео";
+"All Aerials (%ld)" = "Все аэрозаставки (%ld)";
+"All Aerials|mode" = "все аэрозаставки";
+"Show Now" = "Показать сейчас";
+"Keep Downloaded" = "Оставить загруженным";
+"Videos you haven’t downloaded can rotate too: each one is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month. Automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay." = "Показываются и незагруженные видео: каждое загружается перед своим показом, а видео, которое оно сменило, удаляется. С вашим интервалом это около %@ трафика в месяц. При экономии трафика и в режиме энергосбережения автоматическая смена ждёт. Видео, которые вы загрузили сами, остаются.";
+"Not in use. If you remove them, the rotation downloads them again for their turn." = "Не используются. Если их убрать, они загрузятся снова, когда придёт их очередь.";
+"The video on screen and your own videos stay. Empty the Trash to free %@. If you turn off Keep Only the Video on Screen later, download them again to rotate them." = "Видео на экране и ваши видео останутся. Очистите Корзину, чтобы освободить %@. Если потом выключить «Хранить только видео на экране», загрузите их снова, чтобы они показывались.";
+"Next video waits: Low Power Mode is on" = "Следующее видео ждёт: включён режим энергосбережения";
+"Next video waits for the network" = "Следующее видео ждёт подключения к сети";
+"Next video unavailable; trying another soon" = "Следующее видео недоступно, скоро будет другое";
+"Downloading “%@” · %ld%%" = "Загрузка «%@» · %ld %%";
+"Downloads it now and deletes it after its turn" = "Загружает видео сейчас и удаляет после показа";
+"Keeps this video after its turn instead of deleting it" = "Оставляет видео после показа, не удаляя";

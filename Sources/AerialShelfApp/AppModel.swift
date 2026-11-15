@@ -9,7 +9,7 @@ import ServiceManagement
 final class AppModel {
     let paths = AerialPaths.live
     private let stateStore: StateStore
-    private let downloader = AerialDownloader()
+    let downloader = AerialDownloader()
     let customStore: CustomLibraryStore
     var downloadedByApp: Set<String> = []
     private var timer: Task<Void, Never>?
@@ -44,6 +44,16 @@ final class AppModel {
     var notice: String?
     /// Error to show as an alert in the library window.
     var windowError: String?
+    /// The video a streaming change is downloading and switching to; nil when none is (see `advance`).
+    var streamTarget: String?
+    /// The user picked `streamTarget` (Show Now) rather than the rotation.
+    var streamTargetChosen = false
+    /// Pause or Cancel Download was pressed during the current streaming change.
+    var streamCancelled = false
+    /// Why the next streaming change is waiting; it tries again at `streamRetryAt`.
+    var streamWait: StreamPolicy.Wait?
+    var streamRetryAt: Date?
+    var streamFailures = 0
     /// True when the app had never run before this launch; the library then opens by itself.
     let isFirstLaunch: Bool
     var state: RotationState {
@@ -176,26 +186,28 @@ final class AppModel {
 
     var pool: [String] {
         guard let catalog else { return [] }
-        return RotationPool.candidates(mode: state.mode, playlists: state.playlists, catalog: catalog, local: local)
+        return RotationPool.candidates(
+            mode: state.mode, playlists: state.playlists, catalog: catalog, local: local, streaming: state.streaming
+        )
     }
 
-    var canAdvance: Bool { !isSwitching && RotationPolicy.canAdvance(pool: pool, current: currentAssetID) }
+    var canAdvance: Bool {
+        !isSwitching && streamTarget == nil && RotationPolicy.canAdvance(pool: pool, current: currentAssetID)
+    }
 
     var totalDownloadedBytes: Int64 { local.values.reduce(0) { $0 + $1.size } }
 
     func poolCount(for mode: RotationMode) -> Int {
         guard let catalog else { return 0 }
-        return RotationPool.candidates(mode: mode, playlists: state.playlists, catalog: catalog, local: local).count
+        return RotationPool.candidates(
+            mode: mode, playlists: state.playlists, catalog: catalog, local: local, streaming: state.streaming
+        ).count
     }
 
     // MARK: Switching
 
-    func next() async {
-        guard !isSwitching else { return }
-        var bag = state.bag
-        guard let id = ShuffleBag.next(pool: pool, bag: &bag, current: currentAssetID) else { return }
-        if await setWallpaper(id) { state.bag = bag }
-    }
+    /// Next Video: the user asked, so a streaming download may use Low Data Mode and Low Power Mode.
+    func next() async { await advance(automatic: false) }
 
     /// Sets one video now. In "Only This Video" mode the chosen video becomes the one that stays.
     @discardableResult
@@ -235,7 +247,10 @@ final class AppModel {
         }
     }
 
-    func pauseRotation() { state.paused = true }
+    func pauseRotation() {
+        state.paused = true
+        cancelStreamDownload()
+    }
 
     /// Resumes the schedule. If the screen shows something the rotation cannot keep, the next video comes now.
     func resumeRotation() async {
@@ -262,13 +277,7 @@ final class AppModel {
         }
     }
 
-    private func setWallpaperFromPool() async -> Bool {
-        var bag = state.bag
-        guard let id = ShuffleBag.next(pool: pool, bag: &bag, current: currentAssetID) else { return false }
-        let done = await setWallpaper(id)
-        if done { state.bag = bag }
-        return done
-    }
+    private func setWallpaperFromPool() async -> Bool { await advance(automatic: false) }
 
     func restoreOriginal() async {
         guard !isSwitching else { return }
@@ -312,18 +321,23 @@ final class AppModel {
         detectUnexpected()
         adoptReturnedCustomFiles()
         if customCatalogNeedsUpdate { await syncCustomCatalog() }
-        await tick()
+        await pruneStreamed()
+        // Not awaited: a streaming change can download for minutes, and the checks above must keep running.
+        // `advance` refuses to start a second change while one is under way.
+        Task { await self.tick() }
     }
 
     func tick() async {
         if DebugOptions.rotateEverySeconds > 0 {
             guard state.nextChange() != nil, let last = state.lastChange else { return }
-            if Date().timeIntervalSince(last) >= DebugOptions.rotateEverySeconds { await next() }
+            if Date().timeIntervalSince(last) >= DebugOptions.rotateEverySeconds, !streamIsWaiting {
+                await advance(automatic: true)
+            }
             return
         }
         switch RotationPolicy.tick(isDue: state.isDue(), pool: pool, current: currentAssetID) {
         case .wait: break
-        case .advance: await next()
+        case .advance: if !streamIsWaiting { await advance(automatic: true) }
         case .postpone: state.lastChange = Date()
         }
     }
@@ -332,6 +346,10 @@ final class AppModel {
     var statusLine: String {
         if let importStatus {
             return L.t("Adding video %ld of %ld…", min(importStatus.done + 1, importStatus.total), importStatus.total)
+        }
+        if let target = streamTarget, let percent = downloadProgress[target], downloadProgress.count == 1 {
+            if streamTargetChosen { return L.t("Downloading “%@” · %ld%%", name(of: target) ?? target, percent) }
+            return L.t("Downloading next video · %ld%%", percent)
         }
         if !downloadProgress.isEmpty {
             let average = downloadProgress.values.reduce(0, +) / max(1, downloadProgress.count)
@@ -342,9 +360,12 @@ final class AppModel {
         if state.paused { return L.t("Paused") }
         if case .single = state.mode { return L.t("Rotation off") }
         if pool.isEmpty {
-            if case .playlist = state.mode { return L.t("No downloaded videos in this playlist") }
+            if case .playlist = state.mode {
+                return state.streaming ? L.t("No videos in this playlist") : L.t("No downloaded videos in this playlist")
+            }
             return L.t("No downloaded videos yet")
         }
+        if state.streaming, let wait = streamWait { return Self.waitText(wait) }
         guard let date = state.nextChange() else { return L.t("Rotation off") }
         return L.t("Next: %@", Self.shortDate(date, language: language))
     }
@@ -402,6 +423,7 @@ final class AppModel {
             try VideoTrash.moveToTrash(assetID: id, paths: paths)
             state.knownVideoIDs.removeAll { $0 == id }
             state.bag.removeAll { $0 == id }
+            state.streamedIDs.removeAll { $0 == id }
             if custom.video(id) != nil { forgetCustomVideo(id) }
         } catch {
             windowError = L.t("Couldn’t move “%@” to the Trash.", name(of: id) ?? id)
@@ -412,7 +434,8 @@ final class AppModel {
 
     func detectUnexpected() {
         unexpected = RotationPool.unexpectedDownloads(
-            known: Set(state.knownVideoIDs), local: local, downloadedByApp: downloadedByApp
+            known: Set(state.knownVideoIDs), local: local, downloadedByApp: downloadedByApp,
+            streamed: Set(state.streamedIDs)
         )
     }
 
@@ -510,7 +533,7 @@ final class AppModel {
 
     // MARK: Messages
 
-    private func report(_ message: String, fromWindow: Bool) {
+    func report(_ message: String, fromWindow: Bool) {
         if fromWindow { windowError = message } else { notice = message }
     }
 

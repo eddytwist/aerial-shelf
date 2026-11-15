@@ -106,6 +106,10 @@ public struct Switcher: Sendable {
     private func applyUnlocked(assetID: String, catalog: Catalog, local: [String: LocalVideo]) async throws -> SwitchResult {
         let verdict = SafetyCheck.verdict(assetID: assetID, catalog: catalog, local: local)
         guard verdict.isSafe else { throw SwitchError.unsafe(assetID, verdict) }
+        // Checked again under the lock: the caller's list may be older than a file another process removed
+        // meanwhile (a streamed copy deleted by `StreamCache`, a video moved to the Trash by `aerialctl`).
+        let onDisk = SafetyCheck.verdict(assetID: assetID, catalog: catalog, local: LocalLibrary.scan(paths: paths))
+        guard onDisk.isSafe else { throw SwitchError.unsafe(assetID, onDisk) }
 
         let before = try readStore()
         let beforeSnapshot = try? WallpaperStore.inspect(before)

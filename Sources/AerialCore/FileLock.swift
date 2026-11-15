@@ -24,7 +24,10 @@ public struct FileLock: Sendable {
     }
 
     /// Runs `body` while holding the lock, waiting up to `timeout` for another process to finish.
-    public func withLock<T>(timeout: Duration = .seconds(15), _ body: () async throws -> T) async throws -> T {
+    /// The body runs on the caller's actor (the app calls it from the main actor).
+    public func withLock<T>(
+        timeout: Duration = .seconds(15), isolation: isolated (any Actor)? = #isolation, _ body: () async throws -> T
+    ) async throws -> T {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let descriptor = open(url.path, O_CREAT | O_RDWR, 0o644)
         guard descriptor >= 0 else { throw LockError.cannotOpen(errno) }

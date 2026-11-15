@@ -7,7 +7,8 @@
 <p><b>Your favorite Apple aerials on rotation, without macOS downloading all 160.</b></p>
 
 <p>macOS Shuffle quietly downloads every aerial video, up to 1.5 GB each.<br>
-Aerial Shelf downloads only the ones you pick and rotates just those. Free, for macOS 26 Tahoe or later.</p>
+Aerial Shelf downloads only the ones you pick and rotates just those, or keeps only the one on screen.<br>
+Free, for macOS 26 Tahoe or later.</p>
 
 <p>
   <a href="https://github.com/eddytwist/aerial-shelf/releases/latest/download/AerialShelf.dmg"><img alt="Download for macOS" src="https://img.shields.io/badge/Download_for_macOS-AerialShelf.dmg-0A84FF?style=for-the-badge&logo=apple&logoColor=white"></a>
@@ -33,6 +34,8 @@ Aerial Shelf downloads only the ones you pick and rotates just those. Free, for 
   download it.
 - **Rotate just those.** All your downloads, a playlist or one video, every 3 hours to once a week, with no repeats.
   macOS Shuffle stays off, so nothing else lands on your disk.
+- **Or keep nothing extra on disk.** Turn on **Keep Only the Video on Screen**, and playlists or all 160 aerials
+  rotate without being stored: each video is downloaded right before its turn, and the one it replaced is deleted.
 - **Add your own videos.** Drop in clips or folders; they rotate with Apple's and appear in System Settings →
   Wallpaper.
 - **Undo anytime.** Your wallpaper settings are backed up first, and **Restore…** brings them back.
@@ -81,6 +84,25 @@ wallpaper and screen saver built into macOS and decides which videos they show.
 macOS keeps the wallpaper choice in a settings file. Aerial Shelf writes one video ID into it and restarts the
 wallpaper service, so the desktop may flicker for a moment. Every change is backed up, read back and checked, and the
 previous settings come back if macOS doesn't accept it. Downloads come only from Apple's servers.
+
+</details>
+
+<details>
+<summary><b>How does Keep Only the Video on Screen work?</b></summary>
+
+Turn it on in Settings → Storage. Playlists and **All Aerials** can then hold videos you haven't downloaded. When it's
+time to change, Aerial Shelf downloads the next video from Apple, sets it as the wallpaper, and only then deletes
+the one it replaced. So the disk holds the video on screen, and two for a moment during a change.
+
+- **Traffic:** each change downloads 0.04–1.5 GB, about 0.5 GB on average. Changing once a day is about 15 GB a
+  month; Settings shows the estimate for your interval.
+- **No network?** The current video stays and the change is tried again later, at most four times before waiting
+  for the next interval. A half-downloaded file is never kept or shown.
+- **Low Data Mode and Low Power Mode:** scheduled changes wait. **Next Video** doesn't, because you asked for it.
+- **What it never deletes:** a video any display, Space, screen saver or the lock screen still uses, videos you
+  downloaded yourself, and your own videos. To free the space of your earlier downloads, Settings offers
+  **Move to Trash…** for them.
+- Streamed copies are deleted for good rather than moved to the Trash, so they don't fill it up.
 
 </details>
 
@@ -163,7 +185,8 @@ killall WallpaperAerialsExtension
 
 ## Privacy
 
-No accounts, no analytics. The app goes online only when you click Download, and only to Apple's servers. The aerial
+No accounts, no analytics. The app goes online only to Apple's servers: when you click Download, and, with Keep Only
+the Video on Screen on, to download the next video before each change. The aerial
 videos, their names and previews belong to Apple; Aerial Shelf doesn't include or redistribute them and isn't
 affiliated with Apple.
 
@@ -181,7 +204,7 @@ scripts/test.sh
 ```
 
 `scripts/build-app.sh --universal --dmg` makes the release disk image. `aerialctl` is a command line tool on the same
-core (`swift run aerialctl status`); it also has `custom off`, which puts macOS back on Apple's catalog if the app was
+core (`swift run aerialctl status`); its `next` switches only to downloaded videos, and it also has `custom off`, which puts macOS back on Apple's catalog if the app was
 removed with My Videos on.
 
 </details>
