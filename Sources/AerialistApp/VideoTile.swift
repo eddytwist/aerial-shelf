@@ -130,7 +130,7 @@ struct VideoTile: View {
             Button(L.t("Cancel"), role: .cancel) {}
         } message: {
             Text(asset.isCustom
-                 ? L.t("Aerial Shelf’s copy goes to the Trash. Your original file stays where it is.")
+                 ? L.t("Aerialist’s copy goes to the Trash. Your original file stays where it is.")
                  : L.t("You can download it again later."))
         }
         .confirmationDialog(L.t("Remove “%@” from My Videos?", model.name(asset)), isPresented: $askingRemove) {

@@ -16,7 +16,7 @@ struct ImportStatus: Equatable {
 extension AppModel {
     var customOverride: CatalogOverride { CatalogOverride(paths: paths) }
 
-    /// Usable as wallpapers right now: switched on, and macOS points at Aerial Shelf's catalog.
+    /// Usable as wallpapers right now: switched on, and macOS points at Aerialist's catalog.
     var customVideosActive: Bool { catalog?.customEnabled ?? false }
 
     var customIDs: Set<String> { Set(custom.videos.map(\.id)) }
@@ -80,7 +80,7 @@ extension AppModel {
             }
         }
         guard !jobs.isEmpty else {
-            windowError = L.t("No videos found. Aerial Shelf adds .mov, .mp4 and .m4v files and folders with them.")
+            windowError = L.t("No videos found. Aerialist adds .mov, .mp4 and .m4v files and folders with them.")
             return
         }
         state.customVideosEnabled = true

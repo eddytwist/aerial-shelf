@@ -37,7 +37,7 @@ final class FakePreferences: PreferencesAccessing, @unchecked Sendable {
         #expect(entry["subcategories"] as? [String] == [CustomLibrary.looseSubcategoryID])
         #expect(entry["includeInShuffle"] as? Bool == false)
         #expect(entry["url-4K-SDR-240FPS"] as? String == CustomLibrary.sourceURL(for: video.id).absoluteString)
-        #expect(CustomLibrary.sourceURL(for: video.id).host() == "aerial-shelf.invalid")
+        #expect(CustomLibrary.sourceURL(for: video.id).host() == "aerialist.invalid")
     }
 
     @Test func noVideosMeansApplesCatalogUnchanged() throws {

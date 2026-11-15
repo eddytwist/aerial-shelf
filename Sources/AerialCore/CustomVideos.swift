@@ -28,7 +28,7 @@ public struct CustomVideo: Codable, Identifiable, Hashable, Sendable {
 }
 
 /// A group of the user's videos, made from a folder. In macOS it is a subcategory of "My Videos";
-/// in Aerial Shelf it also gets a playlist, so the set can rotate on its own.
+/// in Aerialist it also gets a playlist, so the set can rotate on its own.
 public struct CustomSet: Codable, Identifiable, Hashable, Sendable {
     public let id: UUID
     public var name: String
@@ -102,7 +102,7 @@ public struct CustomLibrary: Codable, Equatable, Sendable {
     /// Address written in the catalog and on the file. It can never be downloaded (`.invalid` is reserved),
     /// so macOS has nothing to fetch even if a file goes missing.
     public static func sourceURL(for id: String) -> URL {
-        URL(string: "https://aerial-shelf.invalid/videos/\(id).mov")!
+        URL(string: "https://aerialist.invalid/videos/\(id).mov")!
     }
 
     /// Stable IDs of the "My Videos" category and of its subcategory for videos that aren't in a set.
@@ -183,9 +183,9 @@ public enum CustomCatalog {
                 "id": video.id, "localizedNameKey": video.name, "accessibilityLabel": video.name,
                 "categories": [CustomLibrary.categoryID],
                 "subcategories": [set?.id.uuidString ?? CustomLibrary.looseSubcategoryID],
-                // Never part of Apple's Shuffle: it is only ever chosen by Aerial Shelf.
+                // Never part of Apple's Shuffle: it is only ever chosen by Aerialist.
                 "includeInShuffle": false, "showInTopLevel": true, "preferredOrder": index,
-                "pointsOfInterest": [String: Any](), "shotID": "AERIAL_SHELF_\(video.id)",
+                "pointsOfInterest": [String: Any](), "shotID": "AERIALIST_\(video.id)",
                 "previewImage": preview(video.id),
                 "url-4K-SDR-240FPS": CustomLibrary.sourceURL(for: video.id).absoluteString,
             ])
@@ -195,11 +195,11 @@ public enum CustomCatalog {
         return try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
     }
 
-    private static func preview(_ id: String) -> String { "https://aerial-shelf.invalid/thumbnails/\(id).png" }
+    private static func preview(_ id: String) -> String { "https://aerialist.invalid/thumbnails/\(id).png" }
 }
 
 extension Catalog {
-    /// This catalog plus the user's videos, as Aerial Shelf shows and checks them.
+    /// This catalog plus the user's videos, as Aerialist shows and checks them.
     /// - Parameter enabled: whether macOS currently knows the videos (the catalog override is on).
     public func adding(_ library: CustomLibrary, enabled: Bool) -> Catalog {
         let custom = library.videos.filter { Catalog.isAssetID($0.id) }.map { video in
@@ -220,7 +220,7 @@ extension Catalog {
 
 extension Catalog {
     /// Apple's catalog plus the user's videos, as the app and `aerialctl` use it.
-    /// The videos count as usable only while the user has them on and macOS points at Aerial Shelf's catalog.
+    /// The videos count as usable only while the user has them on and macOS points at Aerialist's catalog.
     public static func loadWithCustom(
         paths: AerialPaths, customVideosEnabled: Bool, preferences: PreferencesAccessing = SystemPreferences()
     ) throws -> Catalog {
@@ -270,7 +270,7 @@ public enum CustomPolicy {
 }
 
 extension CustomLibrary {
-    /// IDs of the user's videos on disk, known or not: files whose `SourceURL` is an Aerial Shelf address.
+    /// IDs of the user's videos on disk, known or not: files whose `SourceURL` is an Aerialist address.
     /// Lets checks work even when the list itself couldn't be read.
     public static func filesOnDisk(_ local: [String: LocalVideo]) -> Set<String> {
         Set(local.filter { $0.value.sourceURL == sourceURL(for: $0.key).absoluteString }.keys)

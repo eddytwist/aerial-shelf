@@ -38,7 +38,7 @@ public struct CatalogOverride: Sendable {
         self.preferences = preferences
     }
 
-    /// True when macOS is set to read Aerial Shelf's catalog.
+    /// True when macOS is set to read Aerialist's catalog.
     public var isActive: Bool {
         (preferences.value(Self.pathKey, domain: Self.domain) as? String) == paths.customCatalog.path
             && (preferences.value(Self.forceKey, domain: Self.domain) as? Bool) == true
@@ -83,7 +83,7 @@ public struct CatalogOverride: Sendable {
         preferences.set(true, Self.forceKey, domain: Self.domain)
     }
 
-    /// Removes both keys, but only when they are Aerial Shelf's own.
+    /// Removes both keys, but only when they are Aerialist's own.
     public func deactivate() {
         guard !isUsedByOthers else { return }
         preferences.set(nil, Self.pathKey, domain: Self.domain)

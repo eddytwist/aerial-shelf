@@ -2,7 +2,7 @@ import AerialCore
 import Foundation
 
 // aerialctl — command-line companion: inspect, switch and restore aerial wallpapers.
-// Shares state with the menu bar app (~/Library/Application Support/AerialShelf/state.json).
+// Shares state with the menu bar app (~/Library/Application Support/Aerialist/state.json).
 
 let usage = """
 usage: aerialctl <command> [options]

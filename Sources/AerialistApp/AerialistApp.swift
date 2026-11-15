@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct AerialShelfApp: App {
+struct AerialistApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ViewState private var model = AppModel()
 
@@ -168,7 +168,7 @@ enum MenuBarIcon {
 
 enum AppInfo {
     /// Product name shown in the UI (from the bundle; `scripts/app.config` sets it).
-    static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Aerial Shelf"
+    static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Aerialist"
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     static let authorURL = URL(string: "https://eddytwist.com")!
 }

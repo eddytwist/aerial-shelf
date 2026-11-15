@@ -16,7 +16,7 @@ struct MenuContent: View {
         Divider()
 
         if model.isAppleShuffleOn {
-            Button(L.t("Use Aerial Shelf Instead")) { Task { await model.replaceAppleShuffle() } }
+            Button(L.t("Use Aerialist Instead")) { Task { await model.replaceAppleShuffle() } }
         }
         Button(L.t("Next Video")) { Task { await model.next() } }
             .keyboardShortcut("n")

@@ -8,7 +8,7 @@ public struct AerialPaths: Sendable, Equatable {
     public let home: URL
     public let appSupport: URL
 
-    public init(home: URL, appFolderName: String = "AerialShelf") {
+    public init(home: URL, appFolderName: String = "Aerialist") {
         self.home = home
         self.appSupport = home
             .appending(path: "Library/Application Support", directoryHint: .isDirectory)
@@ -46,7 +46,7 @@ public struct AerialPaths: Sendable, Equatable {
 
     /// The catalog with the user's videos added, which macOS reads while they are on. It sits next to
     /// macOS's own aerial data because the wallpaper extension can't read files elsewhere.
-    public var customCatalogFolder: URL { aerialsRoot.appending(path: "aerial-shelf", directoryHint: .isDirectory) }
+    public var customCatalogFolder: URL { aerialsRoot.appending(path: "aerialist", directoryHint: .isDirectory) }
     public var customCatalog: URL { customCatalogFolder.appending(path: "entries.json") }
 
     public func videoFile(for assetID: String) -> URL { videos.appending(path: "\(assetID).mov") }

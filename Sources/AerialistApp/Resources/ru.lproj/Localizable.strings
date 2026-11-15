@@ -19,7 +19,7 @@
 "Can’t Find Apple’s Aerial Catalog" = "Каталог аэрозаставок Apple не найден";
 "Categories" = "Категории";
 "Change" = "Менять";
-"Couldn’t change Open at Login. You can add Aerial Shelf in System Settings → General → Login Items & Extensions." = "Не удалось изменить «Открывать при входе». Добавьте Aerial Shelf в Системных настройках → Основные → Объекты входа и расширения.";
+"Couldn’t change Open at Login. You can add Aerialist in System Settings → General → Login Items & Extensions." = "Не удалось изменить «Открывать при входе». Добавьте Aerialist в Системных настройках → Основные → Объекты входа и расширения.";
 "Couldn’t download “%@”. Check your connection and try again." = "Не удалось загрузить «%@». Проверьте подключение и попробуйте снова.";
 "Couldn’t move “%@” to the Trash." = "Не удалось переместить «%@» в Корзину.";
 "Delete Playlist" = "Удалить плейлист";
@@ -104,7 +104,7 @@
 "Settings…" = "Настройки…";
 "Show in Finder" = "Показать в Finder";
 "Some displays have their own wallpaper" = "У некоторых дисплеев свои обои";
-"Some displays or Spaces have their own wallpaper. Aerial Shelf doesn’t change it there." = "На некоторых дисплеях или рабочих столах свои обои — там Aerial Shelf их не меняет.";
+"Some displays or Spaces have their own wallpaper. Aerialist doesn’t change it there." = "На некоторых дисплеях или рабочих столах свои обои — там Aerialist их не меняет.";
 "Something went wrong with “%@”." = "Что-то пошло не так с «%@».";
 "Storage" = "Хранилище";
 "The videos stay downloaded." = "Видео останутся загруженными.";
@@ -112,7 +112,7 @@
 "The wallpaper settings can’t be read. Rotation is paused." = "Не удаётся прочитать настройки обоев. Смена приостановлена.";
 "Try Again" = "Попробовать снова";
 "Update Available" = "Доступно обновление";
-"Use Aerial Shelf Instead" = "Переключиться на Aerial Shelf";
+"Use Aerialist Instead" = "Переключиться на Aerialist";
 "Videos being downloaded now will not be saved." = "Видео, которые сейчас загружаются, не сохранятся.";
 "Wallpaper" = "Обои";
 "You can download it again later." = "Позже его можно загрузить снова.";
@@ -140,7 +140,7 @@
 "Check the spelling or try a new search." = "Проверьте написание или попробуйте изменить запрос.";
 "Rotation is paused." = "Смена приостановлена.";
 "Couldn’t convert “%@” for macOS." = "Не удалось перекодировать «%@» для macOS.";
-"No videos found. Aerial Shelf adds .mov, .mp4 and .m4v files and folders with them." = "Видео не найдены. Aerial Shelf добавляет файлы .mov, .mp4 и .m4v и папки с ними.";
+"No videos found. Aerialist adds .mov, .mp4 and .m4v files and folders with them." = "Видео не найдены. Aerialist добавляет файлы .mov, .mp4 и .m4v и папки с ними.";
 "Add" = "Добавить";
 "Add Videos…" = "Добавить видео…";
 "My Videos" = "Мои видео";
@@ -150,8 +150,8 @@
 "Show My Videos in macOS" = "Показывать мои видео в macOS";
 "Added" = "Добавлено";
 "Adding video %ld of %ld…" = "Добавление видео: %ld из %ld…";
-"Aerial Shelf points macOS to its own copy of Apple’s aerial catalog with your videos added. It uses a macOS setting Apple doesn’t document; you can turn this off in Settings." = "Aerial Shelf подключит к macOS свою копию каталога аэрозаставок Apple с вашими видео. Для этого используется настройка macOS, которую Apple не описывает; это можно выключить в Настройках.";
-"Aerial Shelf’s copy goes to the Trash. Your original file stays where it is." = "В Корзину уйдёт копия Aerial Shelf. Ваш исходный файл останется на месте.";
+"Aerialist points macOS to its own copy of Apple’s aerial catalog with your videos added. It uses a macOS setting Apple doesn’t document; you can turn this off in Settings." = "Aerialist подключит к macOS свою копию каталога аэрозаставок Apple с вашими видео. Для этого используется настройка macOS, которую Apple не описывает; это можно выключить в Настройках.";
+"Aerialist’s copy goes to the Trash. Your original file stays where it is." = "В Корзину уйдёт копия Aerialist. Ваш исходный файл останется на месте.";
 "Another app already points macOS at its own aerial catalog, so My Videos stay off." = "Другое приложение уже подключило к macOS свой каталог аэрозаставок, поэтому мои видео выключены.";
 "Choose videos or folders. Each folder also becomes a playlist." = "Выберите видео или папки. Из каждой папки получится плейлист.";
 "Couldn’t prepare My Videos for macOS. Apple’s videos work as before." = "Не удалось подготовить мои видео для macOS. Видео Apple работают как раньше.";

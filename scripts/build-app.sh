@@ -4,7 +4,7 @@
 #   --install    copy the app to /Applications (or ~/Applications when /Applications is not writable)
 #   --debug      debug build with the testing launch options from DebugOptions.swift
 #   --universal  one binary for Apple Silicon and Intel
-#   --dmg        also make build/AerialShelf-<version>.dmg (the app and a link to Applications), for releases
+#   --dmg        also make build/Aerialist-<version>.dmg (the app and a link to Applications), for releases
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -24,23 +24,23 @@ for arg in "$@"; do
   esac
 done
 
-swift build -c "$CONFIG" --product AerialShelfApp
+swift build -c "$CONFIG" --product AerialistApp
 BIN="$(swift build -c "$CONFIG" --show-bin-path)"
-EXECUTABLE="$BIN/AerialShelfApp"
+EXECUTABLE="$BIN/AerialistApp"
 if [[ "$UNIVERSAL" == 1 ]]; then
   # The Intel slice is built separately (no Xcode needed) and joined with lipo.
-  swift build -c "$CONFIG" --product AerialShelfApp --triple x86_64-apple-macosx26.0 --scratch-path .build-x86_64
-  INTEL="$(swift build -c "$CONFIG" --triple x86_64-apple-macosx26.0 --scratch-path .build-x86_64 --show-bin-path)/AerialShelfApp"
+  swift build -c "$CONFIG" --product AerialistApp --triple x86_64-apple-macosx26.0 --scratch-path .build-x86_64
+  INTEL="$(swift build -c "$CONFIG" --triple x86_64-apple-macosx26.0 --scratch-path .build-x86_64 --show-bin-path)/AerialistApp"
   mkdir -p build/universal
-  lipo -create "$EXECUTABLE" "$INTEL" -output build/universal/AerialShelfApp
-  EXECUTABLE="build/universal/AerialShelfApp"
+  lipo -create "$EXECUTABLE" "$INTEL" -output build/universal/AerialistApp
+  EXECUTABLE="build/universal/AerialistApp"
 fi
 
 APP="build/${APP_NAME}.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$EXECUTABLE" "$APP/Contents/MacOS/${APP_NAME}"
-cp -R Sources/AerialShelfApp/Resources/*.lproj "$APP/Contents/Resources/"
+cp -R Sources/AerialistApp/Resources/*.lproj "$APP/Contents/Resources/"
 if [[ -f Resources/AppIcon.icns ]]; then cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"; fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -73,7 +73,7 @@ echo "built: $APP ($(lipo -archs "$APP/Contents/MacOS/${APP_NAME}"))"
 if [[ "$DMG" == 1 ]]; then
   # A plain disk image: the app next to a link to Applications, ready to drag over.
   STAGE="build/dmg"
-  IMAGE="build/AerialShelf-${VERSION}.dmg"
+  IMAGE="build/Aerialist-${VERSION}.dmg"
   rm -rf "$STAGE" "$IMAGE"
   mkdir -p "$STAGE"
   cp -R "$APP" "$STAGE/"

@@ -31,7 +31,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                 }
                 if model.hasPerDisplayOverrides {
-                    Text(L.t("Some displays or Spaces have their own wallpaper. Aerial Shelf doesn’t change it there."))
+                    Text(L.t("Some displays or Spaces have their own wallpaper. Aerialist doesn’t change it there."))
                         .foregroundStyle(.secondary)
                 }
                 LabeledContent(L.t("Original Wallpaper")) {

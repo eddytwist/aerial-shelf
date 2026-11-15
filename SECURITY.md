@@ -7,7 +7,7 @@ click **Report a vulnerability**. I'll reply as soon as I can.
 
 Only the latest release gets fixes.
 
-## What Aerial Shelf changes on your Mac
+## What Aerialist changes on your Mac
 
 - It writes one video ID into the macOS wallpaper settings file and restarts the wallpaper service. The file is
   backed up first, and every change is read back and checked.

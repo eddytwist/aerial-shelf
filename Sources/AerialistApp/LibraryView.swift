@@ -273,7 +273,7 @@ struct LibraryView: View {
             }
             Button(L.t("Cancel"), role: .cancel) { pendingImport = nil }
         } message: {
-            Text(L.t("Aerial Shelf points macOS to its own copy of Apple’s aerial catalog with your videos added. It uses a macOS setting Apple doesn’t document; you can turn this off in Settings."))
+            Text(L.t("Aerialist points macOS to its own copy of Apple’s aerial catalog with your videos added. It uses a macOS setting Apple doesn’t document; you can turn this off in Settings."))
         }
     }
 
@@ -396,7 +396,7 @@ struct RotationControl: View {
     var body: some View {
         Menu {
             if model.isAppleShuffleOn {
-                Button(L.t("Use Aerial Shelf Instead")) { Task { await model.replaceAppleShuffle() } }
+                Button(L.t("Use Aerialist Instead")) { Task { await model.replaceAppleShuffle() } }
             }
             if model.state.paused {
                 Button(L.t("Resume Rotation")) { Task { await model.resumeRotation() } }

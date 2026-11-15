@@ -1,29 +1,29 @@
 <div align="center">
 
-<img src="docs/icon.png" width="128" height="128" alt="Aerial Shelf icon">
+<img src="docs/icon.png" width="128" height="128" alt="Aerialist icon">
 
-<h1>Aerial Shelf</h1>
+<h1>Aerialist</h1>
 
 <p><b>Your favorite Apple aerials on rotation, without macOS downloading all 160.</b></p>
 
 <p>macOS Shuffle quietly downloads every aerial video, up to 1.5 GB each.<br>
-Aerial Shelf downloads only the ones you pick and rotates just those, or keeps only the one on screen.<br>
+Aerialist downloads only the ones you pick and rotates just those, or keeps only the one on screen.<br>
 Free, for macOS 26 Tahoe or later.</p>
 
 <p>
-  <a href="https://github.com/eddytwist/aerial-shelf/releases/latest/download/AerialShelf.dmg"><img alt="Download for macOS" src="https://img.shields.io/badge/Download_for_macOS-AerialShelf.dmg-0A84FF?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <a href="https://github.com/eddytwist/aerialist/releases/latest/download/Aerialist.dmg"><img alt="Download for macOS" src="https://img.shields.io/badge/Download_for_macOS-Aerialist.dmg-0A84FF?style=for-the-badge&logo=apple&logoColor=white"></a>
 </p>
 
 <p>
   <img alt="macOS 26+" src="https://img.shields.io/badge/macOS-26%2B-black?style=flat-square">
-  <a href="https://github.com/eddytwist/aerial-shelf/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/eddytwist/aerial-shelf?style=flat-square"></a>
+  <a href="https://github.com/eddytwist/aerialist/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/eddytwist/aerialist?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
 </p>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/category-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/category-light.png">
-  <img alt="Aerial Shelf library: a category with downloaded videos first and a download button on the rest" src="docs/screenshots/category-light.png" width="860">
+  <img alt="Aerialist library: a category with downloaded videos first and a download button on the rest" src="docs/screenshots/category-light.png" width="860">
 </picture>
 
 </div>
@@ -58,9 +58,9 @@ Free, for macOS 26 Tahoe or later.</p>
 
 ## Install
 
-1. [Download **AerialShelf.dmg**](https://github.com/eddytwist/aerial-shelf/releases/latest/download/AerialShelf.dmg),
-   open it and drag **Aerial Shelf** to Applications.
-2. Open Aerial Shelf. macOS says it can't verify the app: click **Done**.
+1. [Download **Aerialist.dmg**](https://github.com/eddytwist/aerialist/releases/latest/download/Aerialist.dmg),
+   open it and drag **Aerialist** to Applications.
+2. Open Aerialist. macOS says it can't verify the app: click **Done**.
 3. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You do this once.
 4. The library opens and a mountain appears in the menu bar.
 
@@ -73,7 +73,7 @@ Step 3 is there because the app isn't notarized by Apple yet.
 <details>
 <summary><b>How is it different from <a href="https://github.com/AerialScreensaver/Aerial">Aerial</a>?</b></summary>
 
-Aerial is a screen saver with its own player and video sources. Aerial Shelf doesn't play anything itself: it uses the
+Aerial is a screen saver with its own player and video sources. Aerialist doesn't play anything itself: it uses the
 wallpaper and screen saver built into macOS and decides which videos they show.
 
 </details>
@@ -81,7 +81,7 @@ wallpaper and screen saver built into macOS and decides which videos they show.
 <details>
 <summary><b>Is it safe? What does it change?</b></summary>
 
-macOS keeps the wallpaper choice in a settings file. Aerial Shelf writes one video ID into it and restarts the
+macOS keeps the wallpaper choice in a settings file. Aerialist writes one video ID into it and restarts the
 wallpaper service, so the desktop may flicker for a moment. Every change is backed up, read back and checked, and the
 previous settings come back if macOS doesn't accept it. Downloads come only from Apple's servers.
 
@@ -91,7 +91,7 @@ previous settings come back if macOS doesn't accept it. Downloads come only from
 <summary><b>How does Keep Only the Video on Screen work?</b></summary>
 
 Turn it on in Settings → Storage. Playlists and **All Aerials** can then hold videos you haven't downloaded. When it's
-time to change, Aerial Shelf downloads the next video from Apple, sets it as the wallpaper, and only then deletes
+time to change, Aerialist downloads the next video from Apple, sets it as the wallpaper, and only then deletes
 the one it replaced. So the disk holds the video on screen, and two for a moment during a change.
 
 - **Traffic:** each change downloads 0.04–1.5 GB, about 0.5 GB on average. Changing once a day is about 15 GB a
@@ -117,7 +117,7 @@ offers to switch back.
 <details>
 <summary><b>Screen saver, several displays, Spaces?</b></summary>
 
-If your screen saver follows the wallpaper (the macOS default), it changes too. Aerial Shelf changes the wallpaper
+If your screen saver follows the wallpaper (the macOS default), it changes too. Aerialist changes the wallpaper
 shared by all displays and Spaces; ones with their own wallpaper keep it.
 
 </details>
@@ -126,7 +126,7 @@ shared by all displays and Spaces; ones with their own wallpaper keep it.
 <summary><b>What's the catch with my own videos?</b></summary>
 
 macOS shows them through two preference keys Apple doesn't document. If an update stops honoring them, your videos
-disappear from System Settings; Apple's aren't affected. You can turn them off in Settings at any time. Aerial Shelf
+disappear from System Settings; Apple's aren't affected. You can turn them off in Settings at any time. Aerialist
 works on copies, so your originals stay where they are.
 
 </details>
@@ -163,7 +163,7 @@ log show --last 7d --predicate 'process == "WallpaperAerialsExtension" AND event
 
 1. If you added your own videos, turn off **Show My Videos in macOS** in Settings.
 2. Settings → **Original Wallpaper** → **Restore…**, if you want your old wallpaper back.
-3. Turn off **Open at Login**, quit Aerial Shelf and move it to the Trash.
+3. Turn off **Open at Login**, quit Aerialist and move it to the Trash.
 
 Downloaded videos belong to macOS and stay where System Settings can use them.
 
@@ -187,7 +187,7 @@ killall WallpaperAerialsExtension
 
 No accounts, no analytics. The app goes online only to Apple's servers: when you click Download, and, with Keep Only
 the Video on Screen on, to download the next video before each change. The aerial
-videos, their names and previews belong to Apple; Aerial Shelf doesn't include or redistribute them and isn't
+videos, their names and previews belong to Apple; Aerialist doesn't include or redistribute them and isn't
 affiliated with Apple.
 
 <details>
@@ -196,7 +196,7 @@ affiliated with Apple.
 Build from source with the Command Line Tools (`xcode-select --install`), no Xcode needed:
 
 ```bash
-git clone https://github.com/eddytwist/aerial-shelf.git && cd aerial-shelf && scripts/build-app.sh --install
+git clone https://github.com/eddytwist/aerialist.git && cd aerialist && scripts/build-app.sh --install
 ```
 
 ```bash

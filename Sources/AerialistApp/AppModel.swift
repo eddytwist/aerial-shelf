@@ -496,7 +496,7 @@ final class AppModel {
             do {
                 if newValue { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             } catch {
-                windowError = L.t("Couldn’t change Open at Login. You can add Aerial Shelf in System Settings → General → Login Items & Extensions.")
+                windowError = L.t("Couldn’t change Open at Login. You can add Aerialist in System Settings → General → Login Items & Extensions.")
             }
             loginItemStatus = SMAppService.mainApp.status
         }
