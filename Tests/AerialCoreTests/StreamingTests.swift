@@ -314,46 +314,4 @@ final class RecordingProtocol: URLProtocol, @unchecked Sendable {
     }
 }
 
-@Suite struct RotationSourceTests {
-    @Test func streamingRotatesTheWholeCatalogInsteadOfTheFewDownloads() {
-        #expect(RotationPolicy.source(.allDownloaded, streaming: true) == .allAerials)
-        #expect(RotationPolicy.source(.allAerials, streaming: false) == .allDownloaded)
-        #expect(RotationPolicy.source(.allAerials, streaming: true) == .allAerials)
-        #expect(RotationPolicy.source(.allDownloaded, streaming: false) == .allDownloaded)
-        let playlist = RotationMode.playlist(UUID())
-        #expect(RotationPolicy.source(playlist, streaming: true) == playlist)
-        #expect(RotationPolicy.source(.single("x"), streaming: false) == .single("x"))
-    }
-}
 
-@Suite struct SourceNormalizationTests {
-    @Test func aStreamingStateFrom030RotatesEverythingAndStartsANewRound() {
-        var state = RotationState()
-        state.streaming = true
-        state.mode = .allDownloaded
-        state.bag = ["the-other-downloaded-one"]
-        let changed = state.normalizeSource()
-        #expect(changed)
-        #expect(state.mode == .allAerials)
-        #expect(state.bag.isEmpty)
-        let again = state.normalizeSource()
-        #expect(!again)
-    }
-
-    @Test func playlistsAndSingleVideosAreLeftAlone() {
-        var state = RotationState()
-        state.streaming = true
-        state.mode = .playlist(UUID())
-        state.bag = ["x"]
-        let changed = state.normalizeSource()
-        #expect(!changed)
-        #expect(state.bag == ["x"])
-    }
-
-    @Test func theFallbackAfterADeletedPlaylistFollowsTheStorageMode() {
-        var state = RotationState()
-        #expect(state.wholeLibraryMode == .allDownloaded)
-        state.streaming = true
-        #expect(state.wholeLibraryMode == .allAerials)
-    }
-}

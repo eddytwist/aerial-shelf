@@ -85,18 +85,6 @@ public enum RotationPolicy {
         return id == current || referenced.contains(id)
     }
 
-    /// The whole-library source that fits the storage mode. With Keep Only the Video on Screen on, nothing but the
-    /// video on screen is downloaded, so "All Downloaded" would shrink to one or two videos: the source is All Aerials.
-    /// Without it, All Aerials could only show downloaded videos, so it becomes All Downloaded. Playlists and
-    /// "Only This Video" stay as they are.
-    public static func source(_ mode: RotationMode, streaming: Bool) -> RotationMode {
-        switch mode {
-        case .allDownloaded where streaming: .allAerials
-        case .allAerials where !streaming: .allDownloaded
-        default: mode
-        }
-    }
-
     /// A failed change pauses rotation: retrying every minute would restart the wallpaper service again and again.
     public static let pausesAfterFailedChange = true
 }

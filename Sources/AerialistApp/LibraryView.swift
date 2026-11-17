@@ -3,7 +3,6 @@ import QuickLook
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case downloaded
     case all
     /// The user's own videos.
     case custom
@@ -11,20 +10,17 @@ enum SidebarItem: Hashable {
     case playlist(UUID)
 }
 
-/// The library: Apple's whole aerial catalog, like System Settings, with downloads on request.
+/// The library: My Aerials (what rotates) on top, then Apple's whole catalog like System Settings.
 struct LibraryView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
-    @ViewState private var selection: SidebarItem? = .downloaded
+    @ViewState private var selection: SidebarItem? = .playlist(Playlist.myAerialsID)
     @ViewState private var search = ""
     @ViewState private var renaming: Playlist?
     @ViewState private var newName = ""
     @ViewState private var deleting: Playlist?
     @FocusState private var sidebarFocused: Bool
-    /// Videos that were downloaded when the section was opened. Sorting uses this instead of the live state,
-    /// so a video that finishes downloading doesn't jump to the top under the pointer.
-    @ViewState private var downloadedWhenOpened: Set<String> = []
     /// Files waiting for the one-time "show your own videos in macOS" confirmation; empty means the open panel.
     @ViewState private var pendingImport: [URL]?
 
@@ -32,7 +28,7 @@ struct LibraryView: View {
         NavigationSplitView {
             sidebar
                 .focused($sidebarFocused)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
         } detail: {
             detail
                 .navigationTitle(title)
@@ -60,10 +56,7 @@ struct LibraryView: View {
         }
         // Start in the sidebar, like Finder and Mail, rather than on a random video.
         .defaultFocus($sidebarFocused, true)
-        .onChange(of: selection, initial: true) {
-            downloadedWhenOpened = Set(model.local.keys)
-            search = ""
-        }
+        .onChange(of: selection, initial: true) { search = "" }
         .onAppear {
             LibraryOpener.openAction = { openWindow(id: "library") }
             model.refresh()
@@ -82,14 +75,14 @@ struct LibraryView: View {
         ) {
             Button(L.t("Delete Playlist"), role: .destructive) {
                 if let playlist = deleting {
-                    if selection == .playlist(playlist.id) { selection = .downloaded }
+                    if selection == .playlist(playlist.id) { selection = .playlist(Playlist.myAerialsID) }
                     model.deletePlaylist(playlist.id)
                 }
                 deleting = nil
             }
             Button(L.t("Cancel"), role: .cancel) { deleting = nil }
         } message: {
-            Text(L.t("The videos stay downloaded."))
+            Text(L.t("The videos stay in the library."))
         }
         .alert(model.windowError ?? "", isPresented: Binding(get: { model.windowError != nil }, set: { if !$0 { model.windowError = nil } })) {
             Button(L.t("OK"), role: .cancel) { model.windowError = nil }
@@ -101,28 +94,44 @@ struct LibraryView: View {
     private var sidebar: some View {
         List(selection: $selection) {
             Section {
-                row(L.t("Downloaded"), "arrow.down.circle.fill", count: model.downloadedAssets.count,
-                    rotating: model.state.mode == .allDownloaded)
-                    .tag(SidebarItem.downloaded)
+                row(L.t("My Aerials"), "heart.fill", count: model.myAerialsIDs.count,
+                    rotating: model.state.mode == RotationState.myAerialsMode && !model.showingAllInstead)
+                    .tag(SidebarItem.playlist(Playlist.myAerialsID))
+                    .help(L.t("What rotates. Add videos from any section."))
+                    .dropDestination(for: String.self) { ids, _ in
+                        model.add(ids, to: Playlist.myAerialsID)
+                        return true
+                    }
+                    .contextMenu {
+                        Button(L.t("Rotate My Aerials")) { Task { await model.setMode(RotationState.myAerialsMode) } }
+                    }
                 row(L.t("All Aerials"), "square.grid.2x2.fill", count: model.catalog?.videoAssets.filter { !$0.isCustom }.count ?? 0,
-                    rotating: model.state.mode == .allAerials)
+                    rotating: model.state.mode == .allAerials || model.showingAllInstead)
                     .tag(SidebarItem.all)
+                    .contextMenu {
+                        Button(L.t("Rotate All Aerials")) { Task { await model.setMode(.allAerials) } }
+                    }
                 row(L.t("My Videos"), "film.stack.fill", count: model.custom.videos.count)
                     .tag(SidebarItem.custom)
+                    .help(L.t("Your own video files"))
                     .dropDestination(for: URL.self) { urls, _ in add(urls); return true }
             } header: {
                 sectionHeader(L.t("Library"))
             }
             Section {
                 ForEach(model.catalog?.videoCategories ?? []) { category in
-                    row(model.name(category), Self.icon(for: category.nameKey), count: count(in: category.id))
+                    row(model.name(category), Self.icon(for: category.nameKey), count: count(in: category.id),
+                        rotating: model.state.mode == .category(category.id))
                         .tag(SidebarItem.category(category.id))
+                        .contextMenu {
+                            Button(L.t("Rotate This Category")) { Task { await model.setMode(.category(category.id)) } }
+                        }
                 }
             } header: {
                 sectionHeader(L.t("Categories"))
             }
             Section {
-                ForEach(model.state.playlists) { playlist in
+                ForEach(model.otherPlaylists) { playlist in
                     row(playlist.name, "list.bullet.rectangle.fill", count: playlist.assetIDs.count,
                         rotating: model.state.mode == .playlist(playlist.id))
                         .tag(SidebarItem.playlist(playlist.id))
@@ -208,9 +217,9 @@ struct LibraryView: View {
     private func debugSection(_ value: String) -> SidebarItem? {
         switch value {
         case "all": .all
-        case "downloaded": .downloaded
+        case "downloaded", "mine": .playlist(Playlist.myAerialsID)
         case "custom": .custom
-        case "playlist": model.state.playlists.first.map { .playlist($0.id) } ?? .downloaded
+        case "playlist": model.otherPlaylists.first.map { .playlist($0.id) } ?? .playlist(Playlist.myAerialsID)
         default: model.catalog?.videoCategories.first { $0.id == value || $0.nameKey == value }.map { .category($0.id) }
         }
     }
@@ -316,7 +325,17 @@ struct LibraryView: View {
     }
 
     @ViewBuilder private var emptyState: some View {
-        if selectedPlaylistID != nil {
+        if selectedPlaylistID == Playlist.myAerialsID {
+            ContentUnavailableView {
+                Label(L.t("Nothing in My Aerials Yet"), systemImage: "heart")
+            } description: {
+                Text(model.state.deleteShown
+                     ? L.t("Add videos from any section with ＋ on a tile, or drag them here. Until then, all aerials rotate.")
+                     : L.t("Add videos from any section with ＋ on a tile, or drag them here."))
+            } actions: {
+                Button(L.t("Browse All Aerials")) { selection = .all }
+            }
+        } else if selectedPlaylistID != nil {
             ContentUnavailableView {
                 Label(L.t("Empty Playlist"), systemImage: "list.bullet.rectangle")
             } description: {
@@ -324,9 +343,9 @@ struct LibraryView: View {
             }
         } else {
             ContentUnavailableView {
-                Label(L.t("No Downloaded Videos"), systemImage: "arrow.down.circle")
+                Label(L.t("No Videos"), systemImage: "photo.on.rectangle")
             } description: {
-                Text(L.t("Download the aerials you like. Only those will rotate."))
+                Text(L.t("Add the aerials you like to My Aerials with ＋ on a tile."))
             } actions: {
                 Button(L.t("Browse All Aerials")) { selection = .all }
             }
@@ -341,9 +360,7 @@ struct LibraryView: View {
     private var visibleAssets: [AerialAsset] {
         let all = model.catalog?.videoAssets ?? []
         var assets: [AerialAsset]
-        switch selection ?? .downloaded {
-        case .downloaded:
-            assets = all.filter { model.isDownloaded($0.id) }
+        switch selection ?? .playlist(Playlist.myAerialsID) {
         case .all:
             assets = all.filter { !$0.isCustom }
         case .custom:
@@ -358,22 +375,16 @@ struct LibraryView: View {
             assets = assets.filter { model.name($0).localizedCaseInsensitiveContains(search) }
         }
         if case .playlist = selection { return assets }
-        // Downloaded videos first (as they were when the section opened), then the rest;
-        // each group alphabetical in the UI language.
-        return assets.sorted { a, b in
-            let aDownloaded = downloadedWhenOpened.contains(a.id), bDownloaded = downloadedWhenOpened.contains(b.id)
-            if aDownloaded != bDownloaded { return aDownloaded }
-            return model.name(a).localizedStandardCompare(model.name(b)) == .orderedAscending
-        }
+        // Alphabetical in the interface language; what is on this Mac doesn't matter any more for what can rotate.
+        return assets.sorted { model.name($0).localizedStandardCompare(model.name($1)) == .orderedAscending }
     }
 
     private var title: String {
-        switch selection ?? .downloaded {
-        case .downloaded: L.t("Downloaded")
+        switch selection ?? .playlist(Playlist.myAerialsID) {
         case .all: L.t("All Aerials")
         case .custom: L.t("My Videos")
         case .category(let id): model.catalog?.videoCategories.first { $0.id == id }.map(model.name) ?? ""
-        case .playlist(let id): model.state.playlists.first { $0.id == id }?.name ?? ""
+        case .playlist(let id): model.state.playlists.first { $0.id == id }.map(model.playlistName) ?? ""
         }
     }
 
@@ -385,7 +396,7 @@ struct LibraryView: View {
         if assets.isEmpty { return L.videos(0) }
         if downloaded.count == assets.count { return "\(L.videos(assets.count)) · \(size)" }
         if downloaded.isEmpty { return L.videos(assets.count) }
-        return L.t("%@ · %ld downloaded · %@", L.videos(assets.count), downloaded.count, size)
+        return L.t("%@ · on this Mac: %ld · %@", L.videos(assets.count), downloaded.count, size)
     }
 }
 
@@ -405,28 +416,7 @@ struct RotationControl: View {
                 Button(L.t("Cancel Download")) { model.cancelStreamDownload() }
             }
             if model.isAppleShuffleOn || model.state.paused || model.streamTarget != nil { Divider() }
-            Picker(L.t("Rotate"), selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
-                if model.state.streaming {
-                    Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
-                } else {
-                    Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
-                }
-                ForEach(model.state.playlists) { playlist in
-                    Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id)))).tag(RotationMode.playlist(playlist.id))
-                }
-                if let current = model.currentAssetID, model.isDownloaded(current) {
-                    Text(L.t("Only This Video")).tag(RotationMode.single(current))
-                }
-                if case .single(let id) = model.state.mode, id != model.currentAssetID {
-                    Text(L.t("Only “%@”", model.name(of: id) ?? id)).tag(RotationMode.single(id))
-                }
-            }
-            .pickerStyle(.inline)
-            if !model.state.streaming {
-                Section(L.t("Only downloaded videos rotate")) {
-                    Button(L.t("Rotate All Aerials Without Storing…")) { Task { await model.offerStreaming() } }
-                }
-            }
+            RotationSourcePicker()
             if model.state.mode.rotates {
                 Picker(L.t("Change"), selection: Binding(get: { model.state.interval }, set: { model.state.interval = $0 })) {
                     ForEach(RotationInterval.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -447,7 +437,7 @@ struct RotationControl: View {
 }
 
 /// Grid of video tiles. Like Finder, the grid takes keyboard focus as a whole: arrow keys move the selection,
-/// Space opens Quick Look, Return sets the selected video (or offers to download it), ⌘⌫ moves it to the Trash,
+/// Space opens Quick Look, Return sets the selected video (downloading it first if needed), ⌘⌫ removes it from this Mac,
 /// Escape clears the selection.
 /// The selection is drawn only while moving with the keyboard; a click acts at once instead.
 struct VideoGrid: View {

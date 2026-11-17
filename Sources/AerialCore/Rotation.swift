@@ -16,15 +16,16 @@ public enum RotationInterval: String, CaseIterable, Codable, Sendable {
 }
 
 public enum RotationMode: Codable, Hashable, Sendable {
-    /// Random order over every downloaded video.
+    /// Random order over every downloaded video. Before 0.5 only: moved to My Aerials (`StorageMigration`).
     case allDownloaded
     /// Random order over one playlist's downloaded videos.
     case playlist(UUID)
     /// One fixed video, no rotation.
     case single(String)
-    /// Random order over Apple's whole catalog and the user's own videos. Meant for streaming: then each
-    /// video is downloaded for its turn; without streaming it rotates the downloaded ones, like `allDownloaded`.
+    /// Random order over Apple's whole catalog and the user's own videos; each is downloaded for its turn.
     case allAerials
+    /// Random order over one of Apple's categories (Landscapes, Cities…), by category ID.
+    case category(String)
 }
 
 public struct Playlist: Codable, Identifiable, Hashable, Sendable {
@@ -33,6 +34,11 @@ public struct Playlist: Codable, Identifiable, Hashable, Sendable {
     public var assetIDs: [String]
     /// The set of the user's own videos this playlist was made from; renaming or deleting one follows the other.
     public var customSetID: UUID?
+
+    /// "My Aerials": the built-in playlist at the top of the library, the default rotation. It can't be renamed or
+    /// deleted; its name is shown in the interface language rather than stored.
+    public static let myAerialsID = UUID(uuidString: "A3E21A15-0000-4000-8000-000000000001")!
+    public var isMyAerials: Bool { id == Self.myAerialsID }
 
     public init(id: UUID = UUID(), name: String, assetIDs: [String] = [], customSetID: UUID? = nil) {
         self.id = id
@@ -58,7 +64,7 @@ public struct Playlist: Codable, Identifiable, Hashable, Sendable {
 /// Decoding is tolerant: a missing key takes its default, so a file written by an older or newer
 /// version never wipes playlists.
 public struct RotationState: Codable, Equatable, Sendable {
-    public var mode: RotationMode = .allDownloaded
+    public var mode: RotationMode = RotationState.myAerialsMode
     public var interval: RotationInterval = .day
     public var paused = false
     public var playlists: [Playlist] = []
@@ -76,13 +82,29 @@ public struct RotationState: Codable, Equatable, Sendable {
     public var knownVideosSeeded = false
     /// The user agreed to show their own videos in macOS (see `CatalogOverride`).
     public var customVideosEnabled = false
-    /// "Keep only the video on screen": the rotation downloads each video right before its turn and deletes
-    /// the streamed copy it replaced (see `StreamPolicy`). Off by default.
+    /// Before 0.5: "Keep only the video on screen". Read once by `StorageMigration`, then unused.
     public var streaming = false
-    /// Videos downloaded for streaming that aren't the user's to keep: deleted once nothing uses them.
+    /// Copies the rotation downloaded for a video's turn (not the user's own downloads): with `deleteShown` on they
+    /// are deleted once they fall out of the last `keepLast` shown and nothing uses them. Kept under its 0.2 key.
     public var streamedIDs: [String] = []
-    /// Size of every video streaming has downloaded, for "space saved" (the ones not on disk now).
+    /// Before 0.5: sizes for "space saved". No longer shown.
     public var streamedSizes: [String: Int64] = [:]
+    /// "Delete shown aerials": after a change, rotation copies beyond the last `keepLast` shown are deleted.
+    public var deleteShown = true
+    /// How many of the last shown videos stay on disk (the one on screen counts): one of `keepChoices`.
+    public var keepLast = 3
+    public static let keepChoices = [1, 3, 5, 10]
+    /// Videos the user keeps on this Mac ("Keep on This Mac"): never deleted automatically, not counted in `keepLast`.
+    public var pinnedIDs: [String] = []
+    /// Pinned videos that were rotation copies before: Don't Keep on This Mac makes them copies again. The others
+    /// were the user's own downloads and stay theirs (never deleted automatically).
+    public var pinnedCopies: [String] = []
+    /// Videos shown on screen, most recent first, without repeats. Written by the app only (it also notes
+    /// changes made in System Settings or by `aerialctl`), so the order of deletion is known.
+    public var shownLog: [String] = []
+    public static let shownLogLimit = 100
+    /// 0 before 0.5; 1 once `StorageMigration` has set up My Aerials and the storage settings.
+    public var storageVersion = 0
     /// Keys that were in the file but could not be read (not saved). `StateStore` keeps a copy of such a file.
     public var unreadableKeys: [String] = []
 
@@ -91,6 +113,7 @@ public struct RotationState: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case mode, interval, paused, playlists, bag, lastChange, lastAssetID, knownVideoIDs, knownVideosSeeded
         case customVideosEnabled, streaming, streamedIDs, streamedSizes
+        case deleteShown, keepLast, pinnedIDs, pinnedCopies, shownLog, storageVersion
         case language = "uiLanguage"
     }
 
@@ -108,7 +131,8 @@ public struct RotationState: Codable, Equatable, Sendable {
             }
         }
         let defaults = RotationState()
-        mode = read(RotationMode.self, .mode) ?? defaults.mode
+        // A file without a mode is from before 0.5 (where the default was All Downloaded); StorageMigration moves it.
+        mode = read(RotationMode.self, .mode) ?? .allDownloaded
         interval = read(RotationInterval.self, .interval) ?? defaults.interval
         paused = read(Bool.self, .paused) ?? defaults.paused
         // Playlists one by one: one damaged entry must not take the others with it.
@@ -132,22 +156,50 @@ public struct RotationState: Codable, Equatable, Sendable {
         streaming = read(Bool.self, .streaming) ?? false
         streamedIDs = read([String].self, .streamedIDs) ?? []
         streamedSizes = read([String: Int64].self, .streamedSizes) ?? [:]
+        deleteShown = read(Bool.self, .deleteShown) ?? defaults.deleteShown
+        let keep = read(Int.self, .keepLast) ?? defaults.keepLast
+        keepLast = Self.keepChoices.contains(keep) ? keep : defaults.keepLast
+        pinnedIDs = read([String].self, .pinnedIDs) ?? []
+        pinnedCopies = read([String].self, .pinnedCopies) ?? []
+        shownLog = read([String].self, .shownLog) ?? []
+        storageVersion = read(Int.self, .storageVersion) ?? 0
         unreadableKeys = unreadable
     }
 
-    /// The whole-library source for the current storage mode (see `RotationPolicy.source`).
-    public var wholeLibraryMode: RotationMode { RotationPolicy.source(.allDownloaded, streaming: streaming) }
+    /// The default source: My Aerials.
+    public static let myAerialsMode = RotationMode.playlist(Playlist.myAerialsID)
 
-    /// Puts the source in step with the storage mode. A changed source starts a new round: the old one was drawn
-    /// from the few downloaded videos. Returns whether anything changed.
+    /// Puts the source on something that exists: All Downloaded (before 0.5) and a deleted playlist become
+    /// My Aerials, with a new round. Returns whether anything changed.
     @discardableResult
     public mutating func normalizeSource() -> Bool {
-        let source = RotationPolicy.source(mode, streaming: streaming)
+        var source = mode
+        switch mode {
+        case .allDownloaded: source = Self.myAerialsMode
+        case .playlist(let id) where !playlists.contains(where: { $0.id == id }): source = Self.myAerialsMode
+        default: break
+        }
         guard source != mode else { return false }
         mode = source
         bag = []
         return true
     }
+
+    /// Notes a video that went on screen: it moves to the front of `shownLog`.
+    public mutating func recordShown(_ id: String) {
+        guard shownLog.first != id else { return }
+        shownLog.removeAll { $0 == id }
+        shownLog.insert(id, at: 0)
+        if shownLog.count > Self.shownLogLimit { shownLog.removeLast(shownLog.count - Self.shownLogLimit) }
+    }
+
+    /// The last `keep` videos shown, which stay on disk. Videos kept on this Mac and the user's own (`exempt`) stay
+    /// anyway, so they don't take a place among the N.
+    public func lastShown(keep: Int? = nil, exempt: Set<String> = []) -> Set<String> {
+        Set(shownLog.lazy.filter { !exempt.contains($0) }.prefix(keep ?? keepLast))
+    }
+
+    public var myAerials: Playlist? { playlists.first(where: \.isMyAerials) }
 
     public func nextChange(after now: Date = Date()) -> Date? {
         if case .single = mode { return nil }

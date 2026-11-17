@@ -5,14 +5,9 @@
 "%@ (%ld)" = "%@ (%ld)";
 "%@ GB" = "%@ ГБ";
 "%@ MB" = "%@ МБ";
-"%@ from Apple’s server." = "%@ с сервера Apple.";
-"%@ · %ld downloaded · %@" = "%@ · загружено: %ld · %@";
 "a picture or another kind of wallpaper" = "фото или другие обои";
 "Add to Playlist" = "Добавить в плейлист";
 "All Aerials" = "Все аэрозаставки";
-"All Downloaded (%ld)" = "Все загруженные (%ld)";
-"All Downloaded" = "все загруженные";
-"Apple updated “%@”. Download it again to use it." = "Apple обновила «%@». Загрузите видео снова, чтобы его показывать.";
 "Browse All Aerials" = "Открыть все аэрозаставки";
 "Cancel Download" = "Отменить загрузку";
 "Cancel" = "Отменить";
@@ -26,18 +21,9 @@
 "Delete Playlist…" = "Удалить плейлист…";
 "Delete “%@”?" = "Удалить «%@»?";
 "Dismiss" = "Скрыть";
-"Download Again" = "Загрузить снова";
-"Download Again…" = "Загрузить снова…";
 "Download Failed" = "Не удалось загрузить";
-"Download a video first: there is nothing to show instead of macOS Shuffle." = "Сначала загрузите видео: показывать вместо перемешивания macOS пока нечего.";
-"Download from Apple’s server" = "Загрузить с сервера Apple";
-"Download the aerials you like. Only those will rotate." = "Загрузите понравившиеся аэрозаставки — меняться будут только они.";
-"Download “%@”?" = "Загрузить «%@»?";
-"Download" = "Загрузить";
-"Downloaded" = "Загруженные";
 "Downloading %@ · %ld%%" = "Загрузка: %@ · %ld %%";
 "Downloading… %ld%%" = "Загрузка… %ld %%";
-"Download…" = "Загрузить…";
 "Drag videos here, or right-click one and choose Add to Playlist." = "Перетащите сюда видео или нажмите на видео правой кнопкой и выберите «Добавить в плейлист».";
 "Empty Playlist" = "Плейлист пуст";
 "Every 12 Hours" = "Каждые 12 часов";
@@ -46,7 +32,6 @@
 "Every 6 Hours" = "Каждые 6 часов";
 "Every Day" = "Каждый день";
 "Every Week" = "Каждую неделю";
-"From Apple’s server." = "С сервера Apple.";
 "General" = "Основные";
 "It was: %@." = "Было: %@.";
 "Keep in Library" = "Оставить в медиатеке";
@@ -60,11 +45,7 @@
 "New Playlist" = "Новый плейлист";
 "Next Video" = "Следующее видео";
 "Next: %@" = "Смена: %@";
-"No Downloaded Videos" = "Нет загруженных видео";
-"No downloaded videos in this playlist" = "В плейлисте нет загруженных видео";
-"No downloaded videos yet" = "Пока нет загруженных видео";
 "Not an aerial wallpaper" = "Обои — не аэрозаставка";
-"Not downloaded" = "Не загружено";
 "Not enough space for “%@”: %@ needed, %@ free." = "Недостаточно места для «%@»: нужно %@, свободно %@.";
 "OK" = "ОК";
 "On Screen" = "На экране";
@@ -78,7 +59,6 @@
 "Pause Rotation" = "Приостановить смену";
 "Paused" = "Смена приостановлена";
 "Paused: changed in System Settings" = "Приостановлено: обои изменены в Системных настройках";
-"Playlist" = "плейлист";
 "Playlists" = "Плейлисты";
 "Quit %@" = "Завершить %@";
 "Quit and stop downloads?" = "Завершить и остановить загрузки?";
@@ -92,7 +72,6 @@
 "Restore…" = "Вернуть…";
 "Resume Rotation" = "Возобновить смену";
 "Rotate This Playlist" = "Показывать этот плейлист";
-"Rotate" = "Показывать";
 "Rotate: %@" = "Показывать: %@";
 "Rotating now" = "Сейчас показывается";
 "Rotation off" = "Смена выключена";
@@ -106,7 +85,6 @@
 "Some displays or Spaces have their own wallpaper. Aerialist doesn’t change it there." = "На некоторых дисплеях или рабочих столах свои обои — там Aerialist их не меняет.";
 "Something went wrong with “%@”." = "Что-то пошло не так с «%@».";
 "Storage" = "Хранилище";
-"The videos stay downloaded." = "Видео останутся загруженными.";
 "The wallpaper service didn’t restart. Rotation is paused." = "Служба обоев не перезапустилась. Смена приостановлена.";
 "The wallpaper settings can’t be read. Rotation is paused." = "Не удаётся прочитать настройки обоев. Смена приостановлена.";
 "Try Again" = "Попробовать снова";
@@ -114,7 +92,6 @@
 "Use Aerialist Instead" = "Переключиться на Aerialist";
 "Videos being downloaded now will not be saved." = "Видео, которые сейчас загружаются, не сохранятся.";
 "Wallpaper" = "Обои";
-"You can download it again later." = "Позже его можно загрузить снова.";
 "macOS Shuffle downloads new videos" = "Перемешивание macOS загружает новые видео";
 "macOS Shuffle" = "Перемешивание macOS";
 "macOS didn’t accept the change. The previous wallpaper is back, and rotation is paused." = "macOS не приняла изменение. Прежние обои возвращены, смена приостановлена.";
@@ -129,8 +106,6 @@
 "%@ Settings" = "Настройки %@";
 "Couldn’t restore the original wallpaper. Rotation is paused." = "Не удалось вернуть исходные обои. Смена приостановлена.";
 "Something went wrong. Try again." = "Что-то пошло не так. Попробуйте снова.";
-"One Video" = "одно видео";
-"On Disk" = "На диске";
 "Some settings could not be read. A copy of the old file is in %@." = "Часть настроек не удалось прочитать. Копия старого файла сохранена: %@.";
 "Can’t check whether “%@” is in use, so it stays." = "Не удалось проверить, используется ли «%@», поэтому видео осталось на месте.";
 "Another change is still in progress. Try again in a moment." = "Предыдущее изменение ещё не закончено. Попробуйте чуть позже.";
@@ -176,30 +151,16 @@
 "macOS didn’t show “%@”. My Videos may not work with this macOS version; Apple’s videos aren’t affected. Rotation is paused." = "macOS не показала «%@». Возможно, мои видео не работают в этой версии macOS; видео Apple это не затрагивает. Смена приостановлена.";
 "System Language" = "Язык системы";
 
-/* Keep Only the Video on Screen (streaming). Low Data Mode = «Экономия трафика», Low Power Mode = «Режим энергосбережения», as in macOS. */
-"Keep Only the Video on Screen" = "Хранить только видео на экране";
-"Space Saved" = "Сэкономлено";
-"Downloaded by You" = "Загружено вами";
-"Move %@ to the Trash?" = "Переместить %@ в Корзину?";
 "Can’t check which videos are in use, so they stay." = "Не удаётся проверить, какие видео используются, поэтому они остаются.";
-"Couldn’t move %@ to the Trash." = "Не удалось переместить в Корзину: %@.";
 "Downloading next video · %ld%%" = "Загрузка следующего видео · %ld %%";
 "Next video waits: Low Data Mode is on" = "Следующее видео ждёт: включена экономия трафика";
 "Next video waits: not enough disk space" = "Следующее видео ждёт: мало места на диске";
 "No videos in this playlist" = "В плейлисте нет видео";
 "All Aerials (%ld)" = "Все аэрозаставки (%ld)";
-"All Aerials|mode" = "все аэрозаставки";
-"Show Now" = "Показать сейчас";
-"Keep Downloaded" = "Оставить загруженным";
-"Videos you haven’t downloaded can rotate too: each one is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month. Automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay." = "Показываются и незагруженные видео: каждое загружается перед своим показом, а видео, которое оно сменило, удаляется. С вашим интервалом это около %@ трафика в месяц. При экономии трафика и в режиме энергосбережения автоматическая смена ждёт. Видео, которые вы загрузили сами, остаются.";
-"Not in use. If you remove them, the rotation downloads them again for their turn." = "Не используются. Если их убрать, они загрузятся снова, когда придёт их очередь.";
-"The video on screen and your own videos stay. Empty the Trash to free %@. If you turn off Keep Only the Video on Screen later, download them again to rotate them." = "Видео на экране и ваши видео останутся. Очистите Корзину, чтобы освободить %@. Если потом выключить «Хранить только видео на экране», загрузите их снова, чтобы они показывались.";
 "Next video waits: Low Power Mode is on" = "Следующее видео ждёт: включён режим энергосбережения";
 "Next video waits for the network" = "Следующее видео ждёт подключения к сети";
 "Next video unavailable; trying another soon" = "Следующее видео недоступно, скоро будет другое";
 "Downloading “%@” · %ld%%" = "Загрузка «%@» · %ld %%";
-"Downloads it now and deletes it after its turn" = "Загружает видео сейчас и удаляет после показа";
-"Keeps this video after its turn instead of deleting it" = "Оставляет видео после показа, не удаляя";
 
 /* Updates (Sparkle). */
 "Updates" = "Обновления";
@@ -211,12 +172,61 @@
 "Not checked yet" = "Проверок ещё не было";
 "Last checked: %@" = "Последняя проверка: %@";
 
-/* Rotation source (0.3.1). */
 "All Downloaded|source" = "Все загруженные";
 "One Video|source" = "Одно видео";
 "What rotates and how often" = "Что показывается и как часто";
-"Only downloaded videos rotate" = "Показываются только загруженные видео";
-"Rotate All Aerials Without Storing…" = "Показывать все аэрозаставки, не храня их…";
-"Rotate all aerials without storing them?" = "Показывать все аэрозаставки, не храня их?";
 "Playlist|source" = "Плейлист";
-"Each video is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month; automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay. To stop, turn off Keep Only the Video on Screen in Settings → Storage." = "Каждое видео загружается перед своим показом, а видео, которое оно сменило, удаляется. С вашим интервалом это около %@ трафика в месяц; при экономии трафика и в режиме энергосбережения автоматическая смена ждёт. Видео, которые вы загрузили сами, остаются. Чтобы вернуть как было, выключите «Хранить только видео на экране» в Настройках → Хранилище.";
+
+/* My Aerials and storage (0.5). «Мои заставки» is Ed’s name for the built-in playlist. */
+"%@ · on this Mac: %ld · %@" = "%@ · на этом Mac: %ld · %@";
+"About %@ a month" = "Около %@ в месяц";
+"Add to My Aerials" = "Добавить в «Мои заставки»";
+"Add videos from any section with ＋ on a tile, or drag them here. Until then, all aerials rotate." = "Добавляйте видео из любого раздела кнопкой ＋ на плитке или перетаскивайте сюда. Пока здесь пусто, показываются все аэрозаставки.";
+"Before a change the next video is downloaded; after it, older ones are deleted. Videos you keep on this Mac and your own videos stay." = "Перед сменой следующее видео загружается, после смены старые удаляются. Видео, оставленные на этом Mac, и ваши видео остаются.";
+"Category" = "Категория";
+"Couldn’t delete %@." = "Не удалось удалить: %@.";
+"Delete" = "Удалить";
+"Delete %@ already on this Mac?" = "Удалить %@, которые уже на этом Mac?";
+"Delete %@ now?" = "Удалить %@ сейчас?";
+"Delete Them" = "Удалить";
+"Done" = "Готово";
+"Downloads it from Apple first" = "Сначала загрузится с сервера Apple";
+"In My Aerials" = "В «Моих заставках»";
+"In use, or one of your own videos" = "Используется или это ваше видео";
+"Keep Them" = "Оставить";
+"Keep on This Mac" = "Оставить на этом Mac";
+"Keep the Last" = "Хранить последние";
+"Kept on This Mac" = "Оставлено на этом Mac";
+"Kept on This Mac · %@" = "Оставлено на этом Mac · %@";
+"Kept on this Mac: not deleted after its turn" = "Оставлено на этом Mac: не удаляется после показа";
+"Moves the file to the Trash" = "Перемещает файл в Корзину";
+"My Aerials" = "Мои заставки";
+"No videos to show" = "Нечего показывать";
+"Nothing in My Aerials Yet" = "В «Моих заставках» пока пусто";
+"On This Mac" = "На этом Mac";
+"On This Mac · %@" = "На этом Mac · %@";
+"Remove from My Aerials" = "Убрать из «Моих заставок»";
+"Remove from This Mac…" = "Удалить с этого Mac…";
+"Remove “%@” from this Mac?" = "Удалить «%@» с этого Mac?";
+"Rotate All Aerials" = "Показывать все аэрозаставки";
+"Rotate My Aerials" = "Показывать «Мои заставки»";
+"Rotate This Category" = "Показывать эту категорию";
+"Show…" = "Показать…";
+"The file goes to the Trash. The video stays in your playlists and is downloaded again for its turn." = "Файл уйдёт в Корзину. Видео останется в плейлистах и загрузится снова, когда придёт его очередь.";
+"Traffic" = "Трафик";
+"What rotates. Add videos from any section." = "Что показывается. Добавляйте видео из любого раздела.";
+"Your own video files" = "Ваши видеофайлы";
+"Your video" = "Ваше видео";
+"Delete Shown Aerials" = "Удалять показанные аэрозаставки";
+"Don’t Keep on This Mac" = "Не оставлять на этом Mac";
+"Add the aerials you like to My Aerials with ＋ on a tile." = "Добавляйте понравившиеся аэрозаставки в «Мои заставки» кнопкой ＋ на плитке.";
+"Apple updated “%@”. Set it as the wallpaper to download the new version." = "Apple обновила «%@». Сделайте видео обоями, чтобы загрузить новую версию.";
+"Couldn’t show a video instead of macOS Shuffle. Check your connection and try again." = "Не удалось показать видео вместо «Перемешивания macOS». Проверьте подключение и попробуйте снова.";
+"If every video has to be downloaded. Without the network, in Low Data Mode or Low Power Mode, scheduled changes show videos already on this Mac." = "Если каждое видео приходится загружать. Без сети, при экономии трафика и в режиме энергосбережения смена по расписанию показывает видео, которые уже на этом Mac.";
+"No Videos" = "Нет видео";
+"Not on This Mac" = "Нет на этом Mac";
+"The videos stay in the library." = "Видео останутся в медиатеке.";
+"They total %@. They stay in your playlists and are downloaded again for their turn." = "Всего %@. Они останутся в плейлистах и загрузятся снова, когда придёт их очередь.";
+"Videos you downloaded earlier go to the Trash." = "Видео, которые вы загружали раньше, уйдут в Корзину.";
+"Videos you keep on this Mac don’t count. Without the network, videos already on this Mac rotate." = "Видео, оставленные на этом Mac, не считаются. Без сети показываются видео, которые уже на этом Mac.";
+"Add videos from any section with ＋ on a tile, or drag them here." = "Добавляйте видео из любого раздела кнопкой ＋ на плитке или перетаскивайте сюда.";

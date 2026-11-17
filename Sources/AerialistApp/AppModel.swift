@@ -50,10 +50,16 @@ final class AppModel {
     var streamTargetChosen = false
     /// Pause or Cancel Download was pressed during the current streaming change.
     var streamCancelled = false
+    /// The current download was cancelled because the source changed: the new source goes on at once.
+    var streamCancelledForNewSource = false
     /// Why the next streaming change is waiting; it tries again at `streamRetryAt`.
     var streamWait: StreamPolicy.Wait?
     var streamRetryAt: Date?
     var streamFailures = 0
+    /// A clean-up is deleting rotation copies under the switch lock: no change or Keep on This Mac starts meanwhile.
+    var isPruning = false
+    /// init has finished (refresh then also runs the storage migration if the catalog wasn't readable at launch).
+    private var didLaunch = false
     /// True when the app had never run before this launch; the library then opens by itself.
     let isFirstLaunch: Bool
     var state: RotationState {
@@ -93,8 +99,7 @@ final class AppModel {
         refresh()
         adoptReturnedCustomFiles()
         state.startScheduleIfNeeded()
-        // Version 0.3.0 could rotate "All Downloaded" with streaming on: only the one or two videos on disk.
-        state.normalizeSource()
+        migrateStorageIfNeeded()
         if !state.knownVideosSeeded {
             state.knownVideoIDs = Array(local.keys).sorted()
             state.knownVideosSeeded = true
@@ -106,6 +111,7 @@ final class AppModel {
                 Task { await self.replaceAppleShuffle() }
             }
         }
+        didLaunch = true
         startTimer()
         Task { await self.syncCustomCatalog() }
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -127,9 +133,15 @@ final class AppModel {
             catalogProblem = String(describing: error)
         }
         local = LocalLibrary.scan(paths: paths)
+        if didLaunch { migrateStorageIfNeeded() }
         if let data = try? WallpaperStore(url: paths.storeIndex).readData(),
            let snapshot = try? WallpaperStore.inspect(data) {
             currentAssetID = snapshot.isAerial ? snapshot.assetID : nil
+            // Notes changes made in System Settings or by aerialctl too, so the order of deletion stays right.
+            if let shown = currentAssetID, !isSwitching, state.storageVersion >= 1, state.shownLog.first != shown,
+               catalog?.asset(shown) != nil {
+                state.recordShown(shown)
+            }
             hasPerDisplayOverrides = snapshot.hasPerDisplayOverrides
             referencedIDs = WallpaperStore.referencedAssetIDs(data)
             switch RotationPolicy.observe(snapshot, lastAssetID: state.lastAssetID, paused: state.paused) {
@@ -150,6 +162,15 @@ final class AppModel {
         publishStatus()
     }
 
+    /// 0.5: My Aerials and "delete shown, keep the last N" (see StorageMigration). Waits for Apple's catalog: without
+    /// it nothing is known to be on disk, and My Aerials would start empty. Also recreates a missing My Aerials.
+    func migrateStorageIfNeeded() {
+        guard let catalog, state.storageVersion < 1 || state.myAerials == nil else { return }
+        let onDisk = catalog.videoAssets.map(\.id).filter { local[$0] != nil }
+        let shown = currentAssetID.flatMap { catalog.asset($0) == nil ? nil : $0 }
+        StorageMigration.migrate(&state, isNewInstall: isFirstLaunch, onDisk: onDisk, current: shown)
+    }
+
     /// Picks up changes `aerialctl` made to state.json (for example after `aerialctl next`),
     /// so the app neither reports its video as changed outside nor writes old values over it.
     private func reloadStateIfChangedElsewhere() {
@@ -160,8 +181,9 @@ final class AppModel {
         isReloadingState = false
         stateFileDate = date
         L.use(state.language)
-        // A file edited elsewhere (or a mode a newer version wrote) may pair streaming with All Downloaded.
-        state.normalizeSource()
+        // A file edited elsewhere (or by an older version) may point at All Downloaded or a deleted playlist.
+        // Before the 0.5 migration that is StorageMigration's job (it decides between My Aerials and All Aerials).
+        if state.storageVersion >= 1 { state.normalizeSource() }
     }
 
     /// The language the interface is in now (a choice of `system` resolved to `en` or `ru`).
@@ -188,11 +210,18 @@ final class AppModel {
         (catalog?.videoAssets ?? []).filter { local[$0.id] != nil }
     }
 
+    /// What rotates: the chosen source, downloaded or not (a video that isn't on this Mac is downloaded for its turn).
     var pool: [String] {
         guard let catalog else { return [] }
-        return RotationPool.candidates(
-            mode: state.mode, playlists: state.playlists, catalog: catalog, local: local, streaming: state.streaming
-        )
+        return RotationPool.effective(mode: state.mode, playlists: state.playlists, catalog: catalog, local: local,
+                                      deleteShown: state.deleteShown).pool
+    }
+
+    /// My Aerials has fewer than two videos, so All Aerials rotates instead.
+    var showingAllInstead: Bool {
+        guard let catalog else { return false }
+        return RotationPool.effective(mode: state.mode, playlists: state.playlists, catalog: catalog, local: local,
+                                      deleteShown: state.deleteShown).showingAllInstead
     }
 
     var canAdvance: Bool {
@@ -203,9 +232,7 @@ final class AppModel {
 
     func poolCount(for mode: RotationMode) -> Int {
         guard let catalog else { return 0 }
-        return RotationPool.candidates(
-            mode: mode, playlists: state.playlists, catalog: catalog, local: local, streaming: state.streaming
-        ).count
+        return RotationPool.candidates(mode: mode, playlists: state.playlists, catalog: catalog, local: local, streaming: true).count
     }
 
     // MARK: Switching
@@ -224,6 +251,7 @@ final class AppModel {
             if case .single = state.mode { state.mode = .single(result.assetID) }
             state.lastChange = Date()
             state.lastAssetID = result.assetID
+            state.recordShown(result.assetID)
             changedOutside = false
             notice = nil
             refresh()
@@ -244,6 +272,14 @@ final class AppModel {
 
     func setMode(_ mode: RotationMode) async {
         state.mode = mode
+        // A download for the old source isn't needed any more (one the user chose with Set as Wallpaper is):
+        // stop it, wait for it to unwind, then the new source goes on as usual below.
+        if let target = streamTarget, !streamTargetChosen, !pool.contains(target) {
+            streamCancelledForNewSource = true
+            cancelStreamDownload()
+            for _ in 0..<30 where streamTarget != nil { try? await Task.sleep(for: .milliseconds(100)) }
+            streamCancelledForNewSource = false
+        }
         switch RotationPolicy.afterModeChange(to: mode, current: currentAssetID, pool: pool, paused: state.paused) {
         case .show(let id): await setWallpaper(id)
         case .advance: await next()
@@ -276,8 +312,8 @@ final class AppModel {
     func replaceAppleShuffle() async {
         changedOutside = false
         state.paused = false
-        if !(await setWallpaperFromPool()) {
-            notice = L.t("Download a video first: there is nothing to show instead of macOS Shuffle.")
+        if !(await setWallpaperFromPool()), notice == nil {
+            notice = L.t("Couldn’t show a video instead of macOS Shuffle. Check your connection and try again.")
         }
     }
 
@@ -364,19 +400,15 @@ final class AppModel {
         if state.paused { return L.t("Paused") }
         if case .single = state.mode { return L.t("Rotation off") }
         if pool.isEmpty {
-            if case .playlist = state.mode {
-                return state.streaming ? L.t("No videos in this playlist") : L.t("No downloaded videos in this playlist")
-            }
-            return L.t("No downloaded videos yet")
+            if case .playlist = state.mode { return L.t("No videos in this playlist") }
+            return L.t("No videos to show")
         }
-        if state.streaming, let wait = streamWait { return Self.waitText(wait) }
+        if let wait = streamWait { return Self.waitText(wait) }
         guard let date = state.nextChange() else { return L.t("Rotation off") }
         return L.t("Next: %@", Self.shortDate(date, language: language))
     }
 
     // MARK: Downloads and Trash
-
-    func remoteSize(_ asset: AerialAsset) async -> Int64? { try? await downloader.remoteSize(of: asset) }
 
     func download(_ asset: AerialAsset, expectedSize: Int64? = nil) async {
         guard downloadProgress[asset.id] == nil else { return }
@@ -428,6 +460,8 @@ final class AppModel {
             state.knownVideoIDs.removeAll { $0 == id }
             state.bag.removeAll { $0 == id }
             state.streamedIDs.removeAll { $0 == id }
+            state.pinnedIDs.removeAll { $0 == id }
+            state.pinnedCopies.removeAll { $0 == id }
             if custom.video(id) != nil { forgetCustomVideo(id) }
         } catch {
             windowError = L.t("Couldn’t move “%@” to the Trash.", name(of: id) ?? id)
@@ -475,15 +509,16 @@ final class AppModel {
     }
 
     func rename(_ playlistID: UUID, to name: String) {
-        guard let index = state.playlists.firstIndex(where: { $0.id == playlistID }), !name.isEmpty else { return }
+        guard playlistID != Playlist.myAerialsID, let index = state.playlists.firstIndex(where: { $0.id == playlistID }), !name.isEmpty else { return }
         state.playlists[index].name = name
         customSetChanged(playlistID: playlistID, newName: name)
     }
 
     func deletePlaylist(_ playlistID: UUID) {
+        guard playlistID != Playlist.myAerialsID else { return }
         customSetChanged(playlistID: playlistID, newName: nil)
         state.playlists.removeAll { $0.id == playlistID }
-        if state.mode == .playlist(playlistID) { state.mode = state.wholeLibraryMode }
+        state.normalizeSource()
     }
 
     // MARK: Settings
@@ -547,7 +582,7 @@ final class AppModel {
         switch error {
         case SwitchError.unsafe(_, let verdict):
             switch verdict {
-            case .outdatedFile: return L.t("Apple updated “%@”. Download it again to use it.", name)
+            case .outdatedFile: return L.t("Apple updated “%@”. Set it as the wallpaper to download the new version.", name)
             case .notDownloaded, .incompleteFile: return L.t("“%@” isn’t fully downloaded.", name)
             case .customVideosOff: return L.t("My Videos are off in macOS. Turn them on in Settings to use “%@”.", name)
             default: return L.t("“%@” can’t be used as a wallpaper.", name)

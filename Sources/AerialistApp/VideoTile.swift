@@ -18,8 +18,6 @@ struct VideoTile: View {
     /// Opens Quick Look for a downloaded video.
     let preview: () -> Void
 
-    @ViewState private var askingDownload = false
-    @ViewState private var remoteSize: Int64?
     @ViewState private var askingTrash = false
     @ViewState private var hovering = false
     @ViewState private var renaming = false
@@ -33,14 +31,16 @@ struct VideoTile: View {
     private var outdated: Bool { isDownloaded && model.verdict(asset.id) == .outdatedFile }
     /// The user's own videos are never downloaded; Apple's are when missing or outdated.
     private var needsDownload: Bool { !asset.isCustom && (!isDownloaded || outdated) }
+    private var inMyAerials: Bool { model.isInMyAerials(asset.id) }
+    private var pinned: Bool { model.isPinned(asset.id) }
     /// One of the user's videos whose file was deleted outside the app.
     private var missingCustomFile: Bool { asset.isCustom && !isDownloaded }
     /// Can go on screen now (downloaded, current, and for the user's videos: My Videos are on).
     private var canSet: Bool { model.verdict(asset.id) == .safe }
-    /// With Keep Only the Video on Screen on: can be downloaded and shown now, deleted after its turn.
-    private var canShowStreamed: Bool {
-        guard let catalog = model.catalog, model.state.streaming, needsDownload, progress == nil else { return false }
-        return model.streamTarget == nil && !model.isSwitching && StreamPolicy.isStreamable(asset.id, catalog: catalog, local: model.local)
+    /// Set as Wallpaper can run now: the video is ready, or one of Apple's that is downloaded first.
+    private var canShow: Bool {
+        guard let catalog = model.catalog, !isCurrent, progress == nil, model.streamTarget == nil, !model.isSwitching else { return false }
+        return canSet || (needsDownload && StreamPolicy.isStreamable(asset.id, catalog: catalog, local: model.local))
     }
 
     var body: some View {
@@ -51,7 +51,7 @@ struct VideoTile: View {
                 .frame(maxWidth: .infinity)
                 .overlay { Preview(assetID: asset.id, downloaded: isDownloaded) }
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                // A click on the picture does the useful thing: watch a downloaded video, or offer to download it.
+                // A click on the picture plays a video that is on this Mac in Quick Look.
                 .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 // A single click only (no double-click), so Quick Look opens without waiting.
                 .onTapGesture { select(); pictureAction() }
@@ -69,16 +69,13 @@ struct VideoTile: View {
                     }
                 }
                 .overlay(alignment: .bottomTrailing) { badge.padding(8) }
+                .overlay(alignment: .topTrailing) { myAerialsButton.padding(8) }
                 .overlay(alignment: .bottom) {
-                    if hovering, canSet, !isCurrent, progress == nil {
-                        capsule(L.t("Set as Wallpaper"), systemImage: "photo") { setWallpaper() }
+                    if hovering, canShow {
+                        capsule(L.t("Set as Wallpaper"), systemImage: "photo") { show() }
                             .padding(.bottom, 10)
                             .transition(.opacity)
-                    } else if hovering, canShowStreamed {
-                        capsule(L.t("Show Now"), systemImage: "photo") { showStreamed() }
-                            .padding(.bottom, 10)
-                            .transition(.opacity)
-                            .help(L.t("Downloads it now and deletes it after its turn"))
+                            .help(needsDownload ? L.t("Downloads it from Apple first") : L.t("Set as Wallpaper"))
                     }
                 }
 
@@ -94,6 +91,7 @@ struct VideoTile: View {
             Text(status)
                 .font(.subheadline)
                 .foregroundStyle(isCurrent || failed || outdated ? AnyShapeStyle(statusColor) : AnyShapeStyle(.secondary))
+                .modifier(HelpWhen(text: pinned ? L.t("Kept on this Mac: not deleted after its turn") : nil))
                 .lineLimit(1)
                 .monospacedDigit()
                 .padding(.horizontal, 6)
@@ -116,22 +114,14 @@ struct VideoTile: View {
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
         .accessibilityAction { primaryAction() }
         .accessibilityActions { accessibilityActionButtons }
-        .confirmationDialog(L.t("Download “%@”?", model.name(asset)), isPresented: $askingDownload) {
-            Button(outdated ? L.t("Download Again") : L.t("Download")) {
-                Task { await model.download(asset, expectedSize: remoteSize) }
-            }
-            Button(L.t("Cancel"), role: .cancel) {}
-        } message: {
-            Text(remoteSize.map { L.t("%@ from Apple’s server.", AppModel.size($0, language: model.language)) }
-                 ?? L.t("From Apple’s server."))
-        }
-        .confirmationDialog(L.t("Move “%@” to the Trash?", model.name(asset)), isPresented: $askingTrash) {
+        .confirmationDialog(asset.isCustom ? L.t("Move “%@” to the Trash?", model.name(asset)) : L.t("Remove “%@” from this Mac?", model.name(asset)),
+                            isPresented: $askingTrash) {
             Button(L.t("Move to Trash"), role: .destructive) { model.moveToTrash(asset.id) }
             Button(L.t("Cancel"), role: .cancel) {}
         } message: {
             Text(asset.isCustom
                  ? L.t("Aerialist’s copy goes to the Trash. Your original file stays where it is.")
-                 : L.t("You can download it again later."))
+                 : L.t("The file goes to the Trash. The video stays in your playlists and is downloaded again for its turn."))
         }
         .confirmationDialog(L.t("Remove “%@” from My Videos?", model.name(asset)), isPresented: $askingRemove) {
             Button(L.t("Remove"), role: .destructive) { model.removeMissingCustomVideo(asset.id) }
@@ -171,16 +161,23 @@ struct VideoTile: View {
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, Color.accentColor)
                 .accessibilityHidden(true)
-        } else if needsDownload {
-            Button { startDownload() } label: {
-                Image(systemName: failed ? "arrow.clockwise" : "arrow.down")
-                    .font(.system(size: 12, weight: .semibold))
+        }
+    }
+
+    /// Top-right: a heart when the video is in My Aerials (click to remove), a plus on hover otherwise.
+    @ViewBuilder private var myAerialsButton: some View {
+        if !missingCustomFile, inMyAerials || hovering {
+            Button { model.toggleMyAerials(asset.id) } label: {
+                Image(systemName: inMyAerials ? "heart.fill" : "plus")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(inMyAerials ? Color.accentColor : Color.primary)
                     .frame(width: 24, height: 24)
                     .background(.regularMaterial, in: Circle())
             }
             .buttonStyle(.plain)
-            .help(failed ? L.t("Try Again") : (outdated ? L.t("Download Again") : L.t("Download from Apple’s server")))
-            .accessibilityLabel(failed ? L.t("Try Again") : L.t("Download"))
+            .help(inMyAerials ? L.t("Remove from My Aerials") : L.t("Add to My Aerials"))
+            .accessibilityLabel(inMyAerials ? L.t("Remove from My Aerials") : L.t("Add to My Aerials"))
+            .transition(.opacity)
         }
     }
 
@@ -202,7 +199,11 @@ struct VideoTile: View {
         if failed { return L.t("Download Failed") }
         if outdated { return L.t("Update Available") }
         if isCurrent { return L.t("On Screen") }
-        if let file = model.local[asset.id] { return AppModel.size(file.size, language: model.language) }
+        if let file = model.local[asset.id] {
+            let size = AppModel.size(file.size, language: model.language)
+            if asset.isCustom { return size }
+            return pinned ? L.t("Kept on This Mac · %@", size) : L.t("On This Mac · %@", size)
+        }
         return " "
     }
 
@@ -214,13 +215,16 @@ struct VideoTile: View {
     /// What VoiceOver reads: the name and the same state the tile shows.
     private var accessibilityText: String {
         var parts = [model.name(asset)]
+        if inMyAerials { parts.append(L.t("In My Aerials")) }
         if isCurrent { parts.append(L.t("On Screen")) }
         if let progress { parts.append(L.t("Downloading… %ld%%", progress)) }
         else if failed { parts.append(L.t("Download Failed")) }
         else if outdated { parts.append(L.t("Update Available")) }
         else if missingCustomFile { parts.append(L.t("File Missing")) }
-        else if let file = model.local[asset.id] { parts.append(AppModel.size(file.size, language: model.language)) }
-        else { parts.append(L.t("Not downloaded")) }
+        else if let file = model.local[asset.id] {
+            let size = AppModel.size(file.size, language: model.language)
+            parts.append(pinned ? L.t("Kept on This Mac · %@", size) : L.t("On This Mac · %@", size))
+        } else { parts.append(L.t("Not on This Mac")) }
         return parts.joined(separator: ", ")
     }
 
@@ -230,54 +234,52 @@ struct VideoTile: View {
             Button(L.t("Cancel Download")) { model.cancelDownload(asset.id) }
         } else if missingCustomFile {
             Button(L.t("Remove from My Videos…")) { askingRemove = true }
-        } else if needsDownload {
-            if canShowStreamed { Button(L.t("Show Now")) { showStreamed() } }
-            Button(outdated ? L.t("Download Again…") : L.t("Download…")) { startDownload() }
-        } else if canSet, !isCurrent {
-            Button(L.t("Set as Wallpaper")) { setWallpaper() }
+        } else if canShow {
+            Button(L.t("Set as Wallpaper")) { show() }
+        }
+        if !missingCustomFile {
+            Button(inMyAerials ? L.t("Remove from My Aerials") : L.t("Add to My Aerials")) { model.toggleMyAerials(asset.id) }
+        }
+        if !asset.isCustom, progress == nil {
+            Button(pinned ? L.t("Don’t Keep on This Mac") : L.t("Keep on This Mac")) { togglePin() }
         }
         if isDownloaded, !model.isInUse(asset.id) {
-            Button(L.t("Move to Trash…")) { askingTrash = true }
+            Button(asset.isCustom ? L.t("Move to Trash…") : L.t("Remove from This Mac…")) { askingTrash = true }
         }
     }
 
     @ViewBuilder private var menu: some View {
         if missingCustomFile {
             Button(L.t("Remove from My Videos…")) { askingRemove = true }
-        } else if isDownloaded && !outdated {
-            Button(L.t("Set as Wallpaper")) { setWallpaper() }
-                .disabled(isCurrent || !canSet)
+        } else {
+            Button(L.t("Set as Wallpaper")) { show() }
+                .disabled(!canShow)
             Button(L.t("Only This Video")) { Task { await model.setMode(.single(asset.id)) } }
                 .disabled(!canSet)
-        } else if progress != nil {
-            Button(L.t("Cancel Download")) { model.cancelDownload(asset.id) }
-        } else if needsDownload {
-            if model.state.streaming {
-                Button(L.t("Show Now")) { showStreamed() }
-                    .disabled(!canShowStreamed)
+            if progress != nil {
+                Button(L.t("Cancel Download")) { model.cancelDownload(asset.id) }
             }
-            Button(outdated ? L.t("Download Again…") : L.t("Download…")) { startDownload() }
-        }
-        if !missingCustomFile {
             Divider()
+            Button(inMyAerials ? L.t("Remove from My Aerials") : L.t("Add to My Aerials")) { model.toggleMyAerials(asset.id) }
             Menu(L.t("Add to Playlist")) {
-                ForEach(model.state.playlists) { playlist in
+                ForEach(model.otherPlaylists) { playlist in
                     Button(playlist.name) { model.add([asset.id], to: playlist.id) }
                         .disabled(playlist.assetIDs.contains(asset.id))
                 }
-                if !model.state.playlists.isEmpty { Divider() }
+                if !model.otherPlaylists.isEmpty { Divider() }
                 Button(L.t("New Playlist")) { model.createPlaylist(named: model.name(asset), with: [asset.id]) }
             }
-        }
-        if isDownloaded, model.isStreamed(asset.id) {
-            Button(L.t("Keep Downloaded")) { model.keepStreamed(asset.id) }
-                .help(L.t("Keeps this video after its turn instead of deleting it"))
-        }
-        if let playlistID {
-            Button(L.t("Remove from Playlist")) { model.remove(asset.id, from: playlistID) }
-        }
-        if asset.isCustom, isDownloaded {
-            Button(L.t("Rename…")) { newName = model.name(asset); renaming = true }
+            if let playlistID, playlistID != Playlist.myAerialsID {
+                Button(L.t("Remove from Playlist")) { model.remove(asset.id, from: playlistID) }
+            }
+            if !asset.isCustom {
+                Divider()
+                Button(pinned ? L.t("Don’t Keep on This Mac") : L.t("Keep on This Mac")) { togglePin() }
+                    .disabled(progress != nil)
+            }
+            if asset.isCustom, isDownloaded {
+                Button(L.t("Rename…")) { newName = model.name(asset); renaming = true }
+            }
         }
         if isDownloaded {
             Divider()
@@ -285,45 +287,44 @@ struct VideoTile: View {
             Button(L.t("Show in Finder")) {
                 NSWorkspace.shared.activateFileViewerSelecting([model.paths.videoFile(for: asset.id)])
             }
-            Button(L.t("Move to Trash…"), role: .destructive) { askingTrash = true }
+            Button(asset.isCustom ? L.t("Move to Trash…") : L.t("Remove from This Mac…"), role: .destructive) { askingTrash = true }
                 .disabled(model.isInUse(asset.id))
         }
     }
 
-    private func setWallpaper() { Task { await model.setWallpaper(asset.id, fromWindow: true) } }
+    private func show() { Task { await model.show(asset.id) } }
 
-    private func showStreamed() { Task { await model.showStreamed(asset.id) } }
+    private func togglePin() {
+        if pinned { model.stopKeepingOnMac(asset.id) } else { Task { await model.keepOnMac(asset.id) } }
+    }
 
     private func pictureAction() {
-        if progress != nil { return }
-        if needsDownload { startDownload() } else if isDownloaded { preview() }
+        if isDownloaded { preview() }
     }
 
     private var pictureHelp: String {
         if progress != nil { return L.t("Downloading…") }
-        if needsDownload { return outdated ? L.t("Download Again…") : L.t("Download…") }
         if missingCustomFile { return L.t("File Missing") }
-        return L.t("Quick Look")
+        if isDownloaded { return L.t("Quick Look") }
+        return model.name(asset)
     }
 
     private func primaryAction() {
         select()
         if missingCustomFile { askingRemove = true; return }
-        if canSet { setWallpaper() } else if needsDownload, progress == nil { startDownload() } else if isDownloaded { preview() }
-    }
-
-    /// Asks Apple's server for the size first, then shows the confirmation with it
-    /// (a dialog's text doesn't change once it is shown).
-    private func startDownload() {
-        guard !askingDownload else { return }
-        Task {
-            remoteSize = await model.remoteSize(asset)
-            askingDownload = true
-        }
+        if canShow { show() } else if isDownloaded { preview() }
     }
 }
 
-/// Lets downloaded videos be dragged onto a playlist in the sidebar.
+/// A tooltip only when there is something to say.
+private struct HelpWhen: ViewModifier {
+    let text: String?
+    func body(content: Content) -> some View {
+        if let text { content.help(text) } else { content }
+    }
+}
+
+/// Lets videos be dragged onto My Aerials or a playlist in the sidebar.
 private struct DraggableWhen: ViewModifier {
     let enabled: Bool
     let id: String

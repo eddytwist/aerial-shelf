@@ -11,7 +11,7 @@ usage: aerialctl <command> [options]
   list [--all]           downloaded videos (or the whole catalog) with safety status
   set <id|name>          set one downloaded video as the wallpaper
   next                   switch to the next downloaded video of the current rotation
-                         (with Keep Only the Video on Screen on, the app downloads the others)
+                         (the app itself downloads videos that aren't on this Mac)
   download <id|name>     download one video from Apple's server into the macOS folder
   trash <id|name>        move one downloaded video to the Trash
   backup                 save a copy of the wallpaper settings now
@@ -70,6 +70,8 @@ func modeText(_ mode: RotationMode, _ state: RotationState, _ catalog: Catalog) 
     switch mode {
     case .allDownloaded: "all downloaded"
     case .allAerials: "all aerials"
+    case .category(let id): "category \(catalog.categories.first { $0.id == id }.map { catalog.name(of: $0, language: language) } ?? id)"
+    case .playlist(let id) where id == Playlist.myAerialsID: "my aerials"
     case .playlist(let id): "playlist \(state.playlists.first { $0.id == id }?.name ?? id.uuidString)"
     case .single(let id): "one video: \(describe(id, catalog))"
     }
@@ -136,9 +138,9 @@ case "status":
     print("downloaded: \(local.count == 1 ? "1 video" : "\(local.count) videos"), \(gigabytes(total))")
     print("mode:       \(modeText(state.mode, state, catalog))\(state.paused ? " (paused)" : "")\(state.nextChange() == nil && isSingle(state.mode) ? "" : ", " + intervalText(state.interval))")
     if let next = state.nextChange() { print("next:       \(localTime(next))") }
-    if state.streaming {
-        let streamed = state.streamedIDs.filter { local[$0] != nil }
-        print("storage:    keep only the video on screen (\(streamed.count == 1 ? "1 streamed copy" : "\(streamed.count) streamed copies") on disk)")
+    if state.storageVersion >= 1 {
+        let pinned = state.pinnedIDs.filter { local[$0] != nil }.count
+        print("storage:    \(state.deleteShown ? "delete shown, keep the last \(state.keepLast)" : "keep everything shown")\(pinned > 0 ? ", \(pinned) kept on this Mac" : "")")
     }
     print("original:   \(BackupStore(paths: paths).hasOriginal ? paths.originalStoreBackup.path : "not saved yet")")
     let custom = CustomLibraryStore(paths: paths).read()
@@ -182,13 +184,14 @@ case "next":
     let catalog = loadCatalog()
     let local = LocalLibrary.scan(paths: paths)
     let state = stateStore.read() ?? RotationState()
-    let pool = RotationPool.candidates(mode: state.mode, playlists: state.playlists, catalog: catalog, local: local)
+    // What the app rotates, limited to what is on disk (the app itself downloads the rest).
+    let pool = RotationPool.effective(mode: state.mode, playlists: state.playlists, catalog: catalog, local: local,
+                                      deleteShown: state.deleteShown).pool
+        .filter { SafetyCheck.verdict(assetID: $0, catalog: catalog, local: local).isSafe }
     let current = (try? store.snapshot())?.assetID
     var bag = state.bag
     guard let next = ShuffleBag.next(pool: pool, bag: &bag, current: current) else {
-        fail(state.streaming
-             ? "nothing downloaded to switch to; the app downloads the next video itself when its turn comes"
-             : "nothing to rotate: no downloaded videos in the current mode")
+        fail("nothing downloaded to switch to in the current rotation; the app downloads the next video itself when its turn comes")
     }
     await switchTo(next, catalog: catalog, local: local, bag: bag)
 
@@ -220,6 +223,13 @@ case "trash":
     do {
         let trashed = try VideoTrash.moveToTrash(assetID: asset.id, paths: paths)
         print("moved to Trash: \(trashed?.lastPathComponent ?? asset.id)")
+        // A stale "kept on this Mac" or rotation-copy mark would otherwise apply to a later download of the same video.
+        if var state = stateStore.read() {
+            state.pinnedIDs.removeAll { $0 == asset.id }
+            state.pinnedCopies.removeAll { $0 == asset.id }
+            state.streamedIDs.removeAll { $0 == asset.id }
+            try? stateStore.save(state)
+        }
         // One of the user's own videos: take it off the list and out of macOS's catalog too.
         let customStore = CustomLibraryStore(paths: paths)
         var library = customStore.read()

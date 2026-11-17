@@ -6,7 +6,6 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     private let updater = Updater.shared
     @ViewState private var askingRestore = false
-    @ViewState private var askingTrashKept = false
 
     var body: some View {
         Form {
@@ -67,41 +66,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section(L.t("Storage")) {
-                Toggle(isOn: Binding(get: { model.state.streaming }, set: { on in Task { await model.setStreaming(on) } })) {
-                    Text(L.t("Keep Only the Video on Screen"))
-                    Text(streamingDescription)
-                }
-                LabeledContent(L.t("On Disk")) {
-                    HStack(spacing: 10) {
-                        Text("\(L.videos(model.local.count)) · \(AppModel.size(model.totalDownloadedBytes, language: model.language))")
-                            .foregroundStyle(.primary)
-                        Button(L.t("Show in Finder")) { NSWorkspace.shared.open(model.paths.videos) }
-                    }
-                }
-                if model.state.streaming {
-                    let saved = model.streamSavings
-                    if saved.count > 0 {
-                        LabeledContent(L.t("Space Saved")) {
-                            Text("\(L.videos(saved.count)) · \(AppModel.size(saved.bytes, language: model.language))")
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                    let kept = model.keptVideosToTrash
-                    if !kept.isEmpty {
-                        LabeledContent {
-                            HStack(spacing: 10) {
-                                Text("\(L.videos(kept.count)) · \(AppModel.size(keptBytes, language: model.language))")
-                                    .foregroundStyle(.primary)
-                                Button(L.t("Move to Trash…")) { askingTrashKept = true }
-                            }
-                        } label: {
-                            Text(L.t("Downloaded by You"))
-                            Text(L.t("Not in use. If you remove them, the rotation downloads them again for their turn."))
-                        }
-                    }
-                }
-            }
+            StorageSection()
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
@@ -124,12 +89,6 @@ struct SettingsView: View {
             SettingsOpener.bringToFront()
         }
         .onChange(of: model.language) { SettingsWindowTitle.apply() }
-        .confirmationDialog(L.t("Move %@ to the Trash?", L.videos(model.keptVideosToTrash.count)), isPresented: $askingTrashKept) {
-            Button(L.t("Move to Trash"), role: .destructive) { Task { await model.trashKeptVideos() } }
-            Button(L.t("Cancel"), role: .cancel) {}
-        } message: {
-            Text(L.t("The video on screen and your own videos stay. Empty the Trash to free %@. If you turn off Keep Only the Video on Screen later, download them again to rotate them.", AppModel.size(keptBytes, language: model.language)))
-        }
         .confirmationDialog(L.t("Restore the wallpaper you had before %@?", AppInfo.name), isPresented: $askingRestore) {
             Button(L.t("Restore")) { Task { await model.restoreOriginal() } }
             Button(L.t("Cancel"), role: .cancel) {}
@@ -148,13 +107,6 @@ struct SettingsView: View {
         guard let date = updater.lastCheckDate else { return L.t("Not checked yet") }
         let formatted = date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: model.language)))
         return L.t("Last checked: %@", formatted)
-    }
-
-    private var keptBytes: Int64 { model.keptVideosToTrash.reduce(0) { $0 + $1.size } }
-
-    private var streamingDescription: String {
-        let month = AppModel.size(StreamPolicy.monthlyBytes(interval: model.state.interval), language: model.language)
-        return L.t("Videos you haven’t downloaded can rotate too: each one is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month. Automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay.", month)
     }
 
     private var restoreMessage: String {

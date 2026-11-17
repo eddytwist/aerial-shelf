@@ -6,7 +6,6 @@ import Foundation
 public enum StreamPolicy {
     /// Apple's catalog holds 164 videos, about 80 GB (measured 2026-11-07): 0.5 GB per change on average.
     public static let averageVideoBytes: Int64 = 490_000_000
-    public static let largestVideoBytes: Int64 = 1_490_000_000
 
     /// Whether a video can join a streaming rotation: on disk and safe, or one of Apple's videos that can be
     /// downloaded right before its turn (missing, unfinished, or replaced by Apple with a new file).
@@ -141,5 +140,52 @@ public enum StreamCache {
         var seen = Set<String>()
         result.remaining = result.remaining.filter { seen.insert($0).inserted }
         return result
+    }
+}
+
+/// Moves a state from before 0.5 (or a new install) to My Aerials and "delete shown, keep the last N".
+public enum StorageMigration {
+    /// - Parameters:
+    ///   - isNewInstall: no state file existed: deletion on, keep the last 3.
+    ///   - onDisk: catalog videos on disk (Apple's and the user's own), which go into My Aerials.
+    ///   - current: the video on screen, which starts the history of shown videos.
+    /// Upgrading keeps the storage behaviour: with "Keep only the video on screen" on, deletion stays on with N = 1;
+    /// otherwise deletion is off, so nothing the user downloaded is touched.
+    public static func migrate(_ state: inout RotationState, isNewInstall: Bool, onDisk: [String], current: String?) {
+        if state.myAerials == nil {
+            let ids = Array(Set(onDisk + (current.map { [$0] } ?? []))).sorted()
+            state.playlists.insert(Playlist(id: Playlist.myAerialsID, name: "My Aerials", assetIDs: ids), at: 0)
+        }
+        guard state.storageVersion < 1 else {
+            state.normalizeSource()
+            return
+        }
+        if isNewInstall {
+            state.deleteShown = true
+            state.keepLast = 3
+            state.mode = RotationState.myAerialsMode
+        } else {
+            state.deleteShown = state.streaming
+            state.keepLast = state.streaming ? 1 : 3
+            // With streaming on, the whole library meant all of Apple's videos (as 0.4.1 already set it).
+            if state.streaming, state.mode == .allDownloaded { state.mode = .allAerials }
+        }
+        if let current, state.shownLog.isEmpty { state.shownLog = [current] }
+        state.normalizeSource()
+        state.storageVersion = 1
+    }
+}
+
+extension StreamPolicy {
+    /// What turning "Delete shown aerials" on (or lowering N) would delete now: Apple videos on disk that aren't
+    /// pinned, the user's own, among the last N shown, or in use. Shown in the confirmation before anything goes.
+    public static func excess(
+        onDisk: [String], catalog: Catalog, pinned: Set<String>, lastShown: Set<String>, inUse: Set<String>?
+    ) -> [String] {
+        guard let inUse else { return [] }
+        return onDisk.filter { id in
+            guard let asset = catalog.asset(id), !asset.isCustom else { return false }
+            return !pinned.contains(id) && !lastShown.contains(id) && !inUse.contains(id)
+        }.sorted()
     }
 }

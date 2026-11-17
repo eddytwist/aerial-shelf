@@ -7,7 +7,7 @@
 <p><b>Your favorite Apple aerials on rotation, without macOS downloading all 160.</b></p>
 
 <p>macOS Shuffle quietly downloads every aerial video, up to 1.5 GB each.<br>
-Aerialist downloads only the ones you pick and rotates just those, or keeps only the one on screen.<br>
+Aerialist rotates the ones you pick and keeps only the last few on disk.<br>
 Free, for macOS 26 Tahoe or later.</p>
 
 <p>
@@ -30,12 +30,11 @@ Free, for macOS 26 Tahoe or later.</p>
 
 ## Features
 
-- **Download only what you pick.** All 160 Apple aerials by category, with each video's size shown before you
-  download it.
-- **Rotate just those.** All your downloads, a playlist or one video, every 3 hours to once a week, with no repeats.
-  macOS Shuffle stays off, so nothing else lands on your disk.
-- **Or keep nothing extra on disk.** Turn on **Keep Only the Video on Screen**, and playlists or all 160 aerials
-  rotate without being stored: each video is downloaded right before its turn, and the one it replaced is deleted.
+- **My Aerials.** Pick favorites from all 160 Apple aerials with ＋ on a tile; they rotate every 3 hours to once a
+  week, with no repeats. A playlist, a category, all aerials or one video can rotate instead.
+- **No pile-up on your disk.** Each video is downloaded right before its turn, and only the last 1, 3, 5 or 10
+  shown stay. macOS Shuffle stays off, so nothing else lands on your disk.
+- **Keep on This Mac** the ones you want offline; without the network, the videos already on disk rotate.
 - **Add your own videos.** Drop in clips or folders; they rotate with Apple's and appear in System Settings →
   Wallpaper.
 - **Undo anytime.** Your wallpaper settings are backed up first, and **Restore…** brings them back.
@@ -49,7 +48,7 @@ Free, for macOS 26 Tahoe or later.</p>
     <td width="62%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/library-dark.png">
-        <img alt="A playlist of downloaded aerials, rotating now" src="docs/screenshots/library-light.png">
+        <img alt="A playlist of aerials, rotating now" src="docs/screenshots/library-light.png">
       </picture>
       <p><sub>Make a playlist to rotate</sub></p>
     </td>
@@ -90,21 +89,22 @@ from this repository's GitHub releases.
 </details>
 
 <details>
-<summary><b>How does Keep Only the Video on Screen work?</b></summary>
+<summary><b>What stays on my disk?</b></summary>
 
-Turn it on in Settings → Storage. Playlists and **All Aerials** can then hold videos you haven't downloaded. When it's
-time to change, Aerialist downloads the next video from Apple, sets it as the wallpaper, and only then deletes
-the one it replaced. So the disk holds the video on screen, and two for a moment during a change.
+When it's time to change, Aerialist downloads the next video from Apple if it isn't on this Mac, sets it as the
+wallpaper, and only then deletes what fell out of the last N shown (Settings → Storage → **Keep the Last**:
+1, 3, 5 or 10). Turn off **Delete Shown Aerials** to keep everything that was shown.
 
-- **Traffic:** each change downloads 0.04–1.5 GB, about 0.5 GB on average. Changing once a day is about 15 GB a
-  month; Settings shows the estimate for your interval.
-- **No network?** The current video stays and the change is tried again later, at most four times before waiting
-  for the next interval. A half-downloaded file is never kept or shown.
-- **Low Data Mode and Low Power Mode:** scheduled changes wait. **Next Video** doesn't, because you asked for it.
-- **What it never deletes:** a video any display, Space, screen saver or the lock screen still uses, videos you
-  downloaded yourself, and your own videos. To free the space of your earlier downloads, Settings offers
-  **Move to Trash…** for them.
-- Streamed copies are deleted for good rather than moved to the Trash, so they don't fill it up.
+- **Traffic:** each change downloads 0.04–1.5 GB, about 0.5 GB on average; once a day is about 15 GB a month.
+  Keeping more videos saves traffic only when My Aerials is that small; otherwise each video comes back after a
+  full round anyway.
+- **No network, Low Data Mode or Low Power Mode:** a scheduled change shows a video from your rotation that is
+  already on disk. **Next Video** downloads anyway, because you asked for it. A half-downloaded file is never kept.
+- **Never deleted:** videos you **Keep on This Mac**, your own videos, and any video a display, Space, the screen
+  saver or the lock screen still uses. Settings → Storage → **On This Mac → Show…** lists every file.
+- Turning deletion on asks first about videos already on disk; lowering N asks first if more than one would go.
+- Copies the rotation downloaded are deleted for good, so they don't fill the Trash; your earlier downloads go to
+  the Trash.
 
 </details>
 
@@ -155,7 +155,7 @@ log show --last 7d --predicate 'process == "WallpaperAerialsExtension" AND event
 |---|---|
 | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | Move the selection |
 | <kbd>Space</kbd> | Quick Look |
-| <kbd>Return</kbd> | Set as wallpaper, or download |
+| <kbd>Return</kbd> | Set as wallpaper (downloads it first if needed) |
 | <kbd>⌘</kbd> <kbd>⌫</kbd> | Move to the Trash |
 
 </details>
@@ -189,8 +189,8 @@ killall WallpaperAerialsExtension
 
 No accounts, no analytics. The app goes online for two things:
 
-- **Videos, from Apple's servers:** when you click Download, and, with Keep Only the Video on Screen on, to download
-  the next video before each change.
+- **Videos, from Apple's servers:** the next video before each change when it isn't on this Mac, and when you set
+  one as the wallpaper or keep it on this Mac.
 - **Updates, from GitHub:** at first launch and then once a day it downloads a small file from this repository's
   latest release to see if there's a newer version. Nothing pops up: the menu and Settings offer **Update to …**,
   and only when you click it does the app download the new version from the same place. It sends nothing else;

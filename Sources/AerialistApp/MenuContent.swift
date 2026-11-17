@@ -29,33 +29,16 @@ struct MenuContent: View {
         } else if model.state.mode.rotates {
             Button(L.t("Pause Rotation")) { model.pauseRotation() }
         }
+        if let current = model.currentAssetID, model.catalog?.asset(current) != nil {
+            Button(model.isInMyAerials(current) ? L.t("Remove from My Aerials") : L.t("Add to My Aerials")) {
+                model.toggleMyAerials(current)
+            }
+        }
 
         Divider()
 
-        Menu(L.t("Rotate: %@", modeTitle(model.state.mode))) {
-            Picker(selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
-                if model.state.streaming {
-                    Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
-                } else {
-                    Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
-                }
-                ForEach(model.state.playlists) { playlist in
-                    Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id))))
-                        .tag(RotationMode.playlist(playlist.id))
-                }
-                if let current = model.currentAssetID, model.isDownloaded(current) {
-                    Text(L.t("Only This Video")).tag(RotationMode.single(current))
-                }
-                if case .single(let id) = model.state.mode, id != model.currentAssetID {
-                    Text(L.t("Only “%@”", model.name(of: id) ?? id)).tag(RotationMode.single(id))
-                }
-            } label: { EmptyView() }
-            .pickerStyle(.inline)
-            if !model.state.streaming {
-                Section(L.t("Only downloaded videos rotate")) {
-                    Button(L.t("Rotate All Aerials Without Storing…")) { Task { await model.offerStreaming() } }
-                }
-            }
+        Menu(L.t("Rotate: %@", model.sourceTitle)) {
+            RotationSourcePicker()
         }
         if model.state.mode.rotates {
             Menu(model.state.interval.title) {
@@ -111,20 +94,42 @@ struct MenuContent: View {
         LibraryOpener.bringToFront()
     }
 
-    private func modeTitle(_ mode: RotationMode) -> String {
-        switch mode {
-        case .allDownloaded: L.t("All Downloaded")
-        case .allAerials: L.t("All Aerials", context: "mode")
-        case .playlist(let id): model.state.playlists.first { $0.id == id }?.name ?? L.t("Playlist")
-        case .single: L.t("One Video")
-        }
-    }
-
     /// Menu items do not wrap; long messages show their first words, the full text one level down.
     static func shorten(_ text: String, limit: Int = 48) -> String {
         guard text.count > limit else { return text }
         let cut = text.prefix(limit)
         return (cut.lastIndex(of: " ").map { String(cut[..<$0]) } ?? String(cut)) + "…"
+    }
+}
+
+/// What can rotate: My Aerials, the user's playlists, all of Apple's aerials, a category, or one video.
+/// Shared by the menu bar menu and the library toolbar.
+struct RotationSourcePicker: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Picker(selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
+            Text(L.t("%@ (%ld)", L.t("My Aerials"), model.poolCount(for: RotationState.myAerialsMode)))
+                .tag(RotationState.myAerialsMode)
+            ForEach(model.otherPlaylists) { playlist in
+                Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id))))
+                    .tag(RotationMode.playlist(playlist.id))
+            }
+            Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
+            Section(L.t("Categories")) {
+                ForEach(model.catalog?.videoCategories ?? []) { category in
+                    Text(L.t("%@ (%ld)", model.name(category), model.poolCount(for: .category(category.id))))
+                        .tag(RotationMode.category(category.id))
+                }
+            }
+            if let current = model.currentAssetID, model.isDownloaded(current) {
+                Text(L.t("Only This Video")).tag(RotationMode.single(current))
+            }
+            if case .single(let id) = model.state.mode, id != model.currentAssetID {
+                Text(L.t("Only “%@”", model.name(of: id) ?? id)).tag(RotationMode.single(id))
+            }
+        } label: { EmptyView() }
+        .pickerStyle(.inline)
     }
 }
 

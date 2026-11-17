@@ -1,30 +1,32 @@
 import AerialCore
 import AppKit
 
-/// "Keep Only the Video on Screen" (`RotationState.streaming`): the rotation may include videos that aren't
-/// downloaded. Each one is downloaded right before its turn; the video on screen stays until the new one is
-/// fully downloaded and set, and the streamed copy it replaced is deleted afterwards.
+/// Rotation without keeping everything on disk. Any video can rotate: one that isn't on this Mac is downloaded right
+/// before its turn, and the video on screen stays until the new one is fully downloaded and set. With
+/// "Delete shown aerials" on (`RotationState.deleteShown`), copies the rotation downloaded are deleted once they fall
+/// out of the last `keepLast` shown and nothing uses them. Videos kept on this Mac and the user's own are never deleted.
 extension AppModel {
     /// After this many failed tries in a row an automatic change gives up until the next interval.
     static let streamTriesPerChange = 4
 
-    /// A streaming change failed and waits before trying again (only automatic changes wait).
+    /// An automatic change failed and waits before trying again.
     var streamIsWaiting: Bool {
-        guard state.streaming, let retry = streamRetryAt else { return false }
+        guard let retry = streamRetryAt else { return false }
         return Date() < retry
     }
 
     /// Shows the next video of the rotation.
     /// - Parameter automatic: true for the schedule. Then a download skips Low Data Mode, expensive networks and
-    ///   Low Power Mode, and waits instead; Next Video and other changes the user asks for don't.
+    ///   Low Power Mode and shows a video that is already on disk instead; Next Video and other changes the user
+    ///   asks for download anyway.
     @discardableResult
     func advance(automatic: Bool) async -> Bool {
-        guard !isSwitching, streamTarget == nil, let catalog else { return false }
+        guard !isSwitching, streamTarget == nil, !isPruning, let catalog else { return false }
         var bag = state.bag
         // A video the user is downloading right now waits for its download to finish.
         let candidates = pool.filter { downloadProgress[$0] == nil }
         guard let id = ShuffleBag.next(pool: candidates, bag: &bag, current: currentAssetID) else { return false }
-        if state.streaming, StreamPolicy.needsDownload(id, catalog: catalog, local: local) {
+        if StreamPolicy.needsDownload(id, catalog: catalog, local: local) {
             return await streamAndShow(id, automatic: automatic, bagAfter: bag)
         }
         let done = await setWallpaper(id)
@@ -32,15 +34,19 @@ extension AppModel {
         return done
     }
 
-    /// Show Now on a video that isn't downloaded: downloads it as a streamed copy and sets it.
-    func showStreamed(_ id: String) async {
-        guard state.streaming, !isSwitching, streamTarget == nil else { return }
+    /// Set as Wallpaper on any tile: downloads the video first when it isn't on this Mac.
+    func show(_ id: String) async {
+        guard !isSwitching, streamTarget == nil, !isPruning, let catalog else { return }
+        guard StreamPolicy.needsDownload(id, catalog: catalog, local: local) else {
+            await setWallpaper(id, fromWindow: true)
+            return
+        }
         var bag = state.bag
         bag.removeAll { $0 == id }
         await streamAndShow(id, automatic: false, bagAfter: bag, fromWindow: true, chosen: true)
     }
 
-    /// Downloads a video, sets it, and leaves the streamed copy it replaced to `pruneStreamed`.
+    /// Downloads a video, sets it, and leaves the copy it replaced to `pruneStreamed`.
     /// On any failure the video on screen stays; nothing half-downloaded is left behind.
     @discardableResult
     private func streamAndShow(
@@ -48,8 +54,7 @@ extension AppModel {
     ) async -> Bool {
         guard let asset = catalog?.asset(id), downloadProgress[id] == nil else { return false }
         if let wait = StreamPolicy.waitsBeforeDownload(automatic: automatic, lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled) {
-            postponeStream(wait, automatic: automatic)
-            return false
+            return await showFromDiskOrWait(wait)
         }
         // Protects the video from `pruneStreamed` from the start of the download until it is on screen.
         streamTarget = id
@@ -81,44 +86,67 @@ extension AppModel {
             refresh()
             if streamed, local[id] == nil { state.streamedIDs.removeAll { $0 == id } }
             guard let wait = StreamPolicy.wait(after: error) else {
-                // Cancelled: an automatic change waits a whole interval; a manual one just stops.
-                if automatic { state.lastChange = Date() }
+                // Cancelled: an automatic change waits a whole interval; a manual one just stops. A new source
+                // goes on at once instead.
+                if automatic, !streamCancelledForNewSource { state.lastChange = Date() }
                 return false
             }
             // Apple's server refused this one: the next try picks another video.
             if wait == .server { state.bag = bagAfter }
-            postponeStream(wait, automatic: automatic)
+            // Short of space: older shown copies make room for the next try.
+            if wait == .diskSpace { await pruneStreamed(now: true, keep: max(1, state.keepLast - 1), duringChange: true) }
             if !automatic || wait == .diskSpace {
                 report(Self.message(for: error, videoName: name(asset)), fromWindow: fromWindow)
             }
-            return false
+            guard automatic else {
+                streamFailures += 1
+                return false
+            }
+            return await showFromDiskOrWait(wait)
         }
         downloadProgress[id] = nil
         state.knownVideoIDs = Array(Set(state.knownVideoIDs).union([id])).sorted()
         refresh()
-        if streamed, let file = local[id] { state.streamedSizes[id] = file.size }
         // Paused while the last bytes arrived: keep the file (it is deleted later) but don't change the wallpaper.
         if streamCancelled || (automatic && state.paused) { return false }
+        // The source changed during the download: the video doesn't belong to the rotation any more.
+        if !chosen, !pool.contains(id) { return false }
         let done = await setWallpaper(id, fromWindow: fromWindow)
         if done {
             state.bag = bagAfter
-            streamWait = nil
-            streamRetryAt = nil
-            streamFailures = 0
+            clearStreamWait()
         }
         return done
     }
 
+    /// A scheduled change that couldn't download: without the network, in Low Data Mode or Low Power Mode it shows
+    /// a video from the source that is already on disk right away (the round isn't touched); otherwise, or when
+    /// nothing is on disk, the video on screen stays and the change is tried again later.
+    private func showFromDiskOrWait(_ wait: StreamPolicy.Wait) async -> Bool {
+        if [.network, .lowDataMode, .lowPowerMode].contains(wait), let catalog,
+           let id = RotationPool.onDiskFallback(pool: pool, catalog: catalog, local: local,
+                                                shownLog: state.shownLog, current: currentAssetID),
+           await setWallpaper(id) {
+            clearStreamWait()
+            return true
+        }
+        postponeStream(wait)
+        return false
+    }
+
+    private func clearStreamWait() {
+        streamWait = nil
+        streamRetryAt = nil
+        streamFailures = 0
+    }
+
     /// Waits before the next automatic try: longer after each failure, and after a few failures in a row until the
     /// next interval, so a bad connection doesn't download the same large video again and again.
-    private func postponeStream(_ wait: StreamPolicy.Wait, automatic: Bool) {
+    private func postponeStream(_ wait: StreamPolicy.Wait) {
         // Low Power Mode isn't a failure: it doesn't make the next network retry wait longer.
         if wait != .lowPowerMode { streamFailures += 1 }
-        guard automatic else { return }
         if streamFailures >= Self.streamTriesPerChange {
-            streamFailures = 0
-            streamWait = nil
-            streamRetryAt = nil
+            clearStreamWait()
             state.lastChange = Date()
             return
         }
@@ -132,19 +160,38 @@ extension AppModel {
         downloader.cancel(assetID: target)
     }
 
-    /// Deletes streamed copies nothing uses any more. Waits half a minute after a change, so the wallpaper
-    /// and screen saver have moved to the new file, and never runs while a change is in progress.
-    /// - Parameter now: skip the half-minute wait (turning streaming off).
-    func pruneStreamed(now: Bool = false) async {
-        guard !state.streamedIDs.isEmpty, !isSwitching, streamTarget == nil else { return }
+    // MARK: Storage
+
+    /// Videos kept on this Mac and the user's own: never deleted, and not counted among the last N.
+    private var exemptFromDeletion: Set<String> { customIDs.union(state.pinnedIDs) }
+
+    /// What must stay whatever the storage settings say.
+    private func protectedFromDeletion(keep: Int) -> Set<String> {
+        let lastShown = state.lastShown(keep: keep, exempt: exemptFromDeletion).union(currentAssetID.map { [$0] } ?? [])
+        return exemptFromDeletion.union(lastShown).union(downloadProgress.keys)
+    }
+
+    /// Deletes rotation copies beyond the last N shown that nothing uses any more. Only with "Delete shown aerials"
+    /// on; waits half a minute after a change, so the wallpaper and screen saver have moved to the new file, and
+    /// never runs while a change is in progress.
+    /// - Parameters:
+    ///   - now: skip the half-minute wait (a confirmed lower N, low disk space).
+    ///   - keep: how many of the last shown stay (default: the setting).
+    ///   - duringChange: called by a change whose download failed (its target isn't on disk, and is protected anyway).
+    func pruneStreamed(now: Bool = false, keep: Int? = nil, duringChange: Bool = false) async {
+        guard state.storageVersion >= 1, state.deleteShown, !state.streamedIDs.isEmpty, !isSwitching, !isPruning,
+              streamTarget == nil || duringChange else { return }
         if !now, let last = state.lastChange, Date().timeIntervalSince(last) < 30 { return }
         let listed = state.streamedIDs
-        let protected = customIDs.union(downloadProgress.keys)
+        let protected = protectedFromDeletion(keep: keep ?? state.keepLast)
         // Quick Look's named links are hard links: while one exists, deleting the video frees no space.
         let expected = StreamPolicy.deletable(streamed: listed, current: currentAssetID, referenced: referencedIDs,
                                               protected: protected, onDisk: Set(local.keys))
         if !expected.isEmpty { removePreviewLinks() }
+        // While the lock is awaited nothing may become the wallpaper or be kept: it could be what is deleted.
+        isPruning = true
         let result = await StreamCache.prune(streamed: listed, protected: protected, paths: paths)
+        isPruning = false
         // Only what this pass looked at: entries added or kept meanwhile stay as they are.
         let dropped = Set(listed).subtracting(result.remaining)
         guard !dropped.isEmpty else { return }
@@ -155,90 +202,37 @@ extension AppModel {
         refresh()
     }
 
-    /// Turns streaming on or off. Nothing is deleted when it goes on. When it goes off, streamed copies nothing
-    /// uses are deleted at once; the ones still in use (the video on screen) become ordinary downloads, and any
-    /// that couldn't be checked now stay listed and are deleted by a later pass. All Aerials falls back to
-    /// All Downloaded.
-    func setStreaming(_ on: Bool) async {
-        state.streaming = on
-        streamWait = nil
-        streamRetryAt = nil
-        streamFailures = 0
-        guard !on else {
-            // The video on screen stays; the next change already picks from the whole catalog.
-            state.normalizeSource()
-            return
-        }
-        cancelStreamDownload()
-        // Let a cancelled download finish unwinding before the last clean-up.
-        for _ in 0..<20 where streamTarget != nil { try? await Task.sleep(for: .milliseconds(100)) }
-        await pruneStreamed(now: true)
-        // Turned on again while this was waiting: leave the new choice alone.
-        guard !state.streaming else { return }
-        refresh()
-        if referencedIDs != nil { state.streamedIDs.removeAll { isInUse($0) } }
-        let source = RotationPolicy.source(state.mode, streaming: false)
-        if source != state.mode { await setMode(source) }
-    }
-
-    /// The source the rotation picks from, for the toolbar and the menu.
-    var sourceTitle: String {
-        switch state.mode {
-        case .allDownloaded: L.t("All Downloaded", context: "source")
-        case .allAerials: L.t("All Aerials")
-        case .playlist(let id): state.playlists.first { $0.id == id }?.name ?? L.t("Playlist", context: "source")
-        case .single: L.t("One Video", context: "source")
-        }
-    }
-
-    /// "Rotate All Aerials…" when only downloaded videos rotate: explains the traffic, then turns on
-    /// Keep Only the Video on Screen, which makes All Aerials the source.
-    func offerStreaming() async {
-        let alert = NSAlert()
-        alert.messageText = L.t("Rotate all aerials without storing them?")
-        let month = Self.size(StreamPolicy.monthlyBytes(interval: state.interval), language: language)
-        alert.informativeText = L.t("Each video is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month; automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay. To stop, turn off Keep Only the Video on Screen in Settings → Storage.", month)
-        alert.addButton(withTitle: L.t("Turn On"))
-        alert.addButton(withTitle: L.t("Cancel"))
-        // A menu bar app isn't in front when its menu is used, and macOS may not let it activate:
-        // a floating alert still shows above other apps' windows.
-        NSApp.activate()
-        alert.window.level = .floating
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        await setStreaming(true)
-        // The button promised All Aerials, also from a playlist or a single video: a new round from it.
-        if state.mode != .allAerials {
-            state.bag = []
-            await setMode(.allAerials)
-        }
-    }
-
-    func isStreamed(_ id: String) -> Bool { state.streamedIDs.contains(id) }
-
-    /// Keep Downloaded: a streamed copy becomes the user's, so it isn't deleted after its turn.
-    func keepStreamed(_ id: String) { state.streamedIDs.removeAll { $0 == id } }
-
-    /// Space streaming saves: videos it has shown that aren't on disk now.
-    var streamSavings: (count: Int, bytes: Int64) {
-        let gone = state.streamedSizes.filter { local[$0.key] == nil }
-        return (gone.count, gone.values.reduce(0, +))
-    }
-
-    /// Apple videos the user downloaded (not streamed copies, not their own videos) that aren't in use:
-    /// with streaming on they can go to the Trash; playlists download them again for their turn.
-    var keptVideosToTrash: [LocalVideo] {
+    /// Videos that would go if "Delete shown aerials" were on with `keep` (for the confirmation): Apple videos on
+    /// disk that aren't kept on this Mac, among the last `keep` shown, or in use.
+    func excess(keep: Int) -> [LocalVideo] {
         guard let catalog else { return [] }
-        let streamed = Set(state.streamedIDs)
-        return local.values.filter { video in
-            guard let asset = catalog.asset(video.assetID), !asset.isCustom else { return false }
-            return !streamed.contains(video.assetID) && !customIDs.contains(video.assetID)
-                && !isInUse(video.assetID) && downloadProgress[video.assetID] == nil
-        }
+        let inUse = referencedIDs.map { $0.union(currentAssetID.map { [$0] } ?? []).union(downloadProgress.keys) }
+        return StreamPolicy.excess(
+            onDisk: Array(local.keys), catalog: catalog, pinned: exemptFromDeletion,
+            lastShown: state.lastShown(keep: keep, exempt: exemptFromDeletion), inUse: inUse
+        ).compactMap { local[$0] }
     }
 
-    /// Moves every video in `keptVideosToTrash` to the Trash. Holds the lock used for changing the wallpaper and
-    /// reads the settings again under it, so none of them can become the wallpaper meanwhile.
-    func trashKeptVideos() async {
+    /// What lowering N would delete: only rotation copies (the user's earlier downloads aren't deleted automatically).
+    func excessOfRotationCopies(keep: Int) -> [LocalVideo] {
+        let copies = Set(state.streamedIDs)
+        return excess(keep: keep).filter { copies.contains($0.assetID) }
+    }
+
+    /// Turns "Delete shown aerials" on or off. When it goes on, the view first asks about what is already on disk
+    /// (`excess`): either everything stays (`keepExisting`) or it goes now (`deleteExisting`).
+    func setDeleteShown(_ on: Bool) { state.deleteShown = on }
+
+    /// "Keep": what is on disk now stays; rotation copies among it become ordinary downloads.
+    func keepExisting(_ videos: [LocalVideo]) {
+        let ids = Set(videos.map(\.assetID))
+        state.streamedIDs.removeAll { ids.contains($0) }
+    }
+
+    /// "Delete": rotation copies are deleted for good (as after their turn); the user's earlier downloads go to the
+    /// Trash. Only the videos the user confirmed, and only those that still qualify: holds the lock used for changing
+    /// the wallpaper and checks again under it that none is in use.
+    func deleteExisting(_ confirmed: [LocalVideo], keep: Int) async {
         guard !isSwitching, streamTarget == nil else {
             windowError = L.t("Another change is still in progress. Try again in a moment.")
             return
@@ -252,10 +246,17 @@ extension AppModel {
                     windowError = L.t("Can’t check which videos are in use, so they stay.")
                     return
                 }
-                for video in keptVideosToTrash {
+                let chosen = Set(confirmed.map(\.assetID))
+                for video in excess(keep: keep) where chosen.contains(video.assetID) {
+                    let id = video.assetID
                     do {
-                        try VideoTrash.moveToTrash(assetID: video.assetID, paths: paths)
-                        state.knownVideoIDs.removeAll { $0 == video.assetID }
+                        if state.streamedIDs.contains(id) {
+                            try FileManager.default.removeItem(at: paths.videoFile(for: id))
+                        } else {
+                            try VideoTrash.moveToTrash(assetID: id, paths: paths)
+                        }
+                        state.streamedIDs.removeAll { $0 == id }
+                        state.knownVideoIDs.removeAll { $0 == id }
                     } catch {
                         failed += 1
                     }
@@ -264,9 +265,76 @@ extension AppModel {
         } catch {
             windowError = L.t("Another change is still in progress. Try again in a moment.")
         }
-        if failed > 0 { windowError = L.t("Couldn’t move %@ to the Trash.", L.videos(failed)) }
+        if failed > 0 { windowError = L.t("Couldn’t delete %@.", L.videos(failed)) }
         refresh()
         detectUnexpected()
+    }
+
+    /// Changes N; when it gets lower, copies beyond it go at once (the view confirms first if more than one would).
+    func setKeepLast(_ keep: Int) async {
+        let lower = keep < state.keepLast
+        state.keepLast = keep
+        if lower { await pruneStreamed(now: true) }
+    }
+
+    /// Roughly how much a month of rotation downloads at the current interval, if every video has to be downloaded.
+    var monthlyTraffic: Int64 { StreamPolicy.monthlyBytes(interval: state.interval) }
+
+    // MARK: Keep on This Mac
+
+    func isPinned(_ id: String) -> Bool { state.pinnedIDs.contains(id) }
+
+    /// Keep on This Mac: never deleted automatically, not counted in N. Downloads the video first if needed.
+    func keepOnMac(_ id: String) async {
+        guard let asset = catalog?.asset(id), !asset.isCustom else { return }
+        // A clean-up holding the lock could be deleting this very file; let it finish first.
+        for _ in 0..<30 where isPruning { try? await Task.sleep(for: .milliseconds(100)) }
+        if local[id] == nil || verdict(id) == .outdatedFile {
+            await download(asset)
+            guard local[id] != nil else { return }
+        }
+        if !state.pinnedIDs.contains(id) { state.pinnedIDs.append(id) }
+        if state.streamedIDs.contains(id) {
+            state.streamedIDs.removeAll { $0 == id }
+            if !state.pinnedCopies.contains(id) { state.pinnedCopies.append(id) }
+        }
+    }
+
+    /// Don't Keep on This Mac. A rotation copy becomes one again (deleted after it falls out of the last N, not
+    /// immediately); a video the user downloaded before 0.5 stays theirs and is never deleted automatically.
+    func stopKeepingOnMac(_ id: String) {
+        state.pinnedIDs.removeAll { $0 == id }
+        let wasCopy = state.pinnedCopies.contains(id)
+        state.pinnedCopies.removeAll { $0 == id }
+        if wasCopy, local[id] != nil, !state.streamedIDs.contains(id) { state.streamedIDs.append(id) }
+    }
+
+    // MARK: My Aerials
+
+    var myAerialsIDs: [String] { state.myAerials?.assetIDs ?? [] }
+
+    func isInMyAerials(_ id: String) -> Bool { myAerialsIDs.contains(id) }
+
+    func toggleMyAerials(_ id: String) {
+        if isInMyAerials(id) { remove(id, from: Playlist.myAerialsID) } else { add([id], to: Playlist.myAerialsID) }
+    }
+
+    /// A playlist's name in the interface: My Aerials in the app's language, the others as the user named them.
+    func playlistName(_ playlist: Playlist) -> String { playlist.isMyAerials ? L.t("My Aerials") : playlist.name }
+
+    /// The user's own playlists (not My Aerials), for the sidebar's Playlists section and Add to Playlist.
+    var otherPlaylists: [Playlist] { state.playlists.filter { !$0.isMyAerials } }
+
+    /// The source the rotation picks from, for the toolbar and the menu.
+    var sourceTitle: String {
+        if showingAllInstead { return L.t("All Aerials") }
+        switch state.mode {
+        case .allDownloaded: return L.t("All Downloaded", context: "source")
+        case .allAerials: return L.t("All Aerials")
+        case .category(let id): return catalog?.categories.first { $0.id == id }.map(name) ?? L.t("Category")
+        case .playlist(let id): return state.playlists.first { $0.id == id }.map(playlistName) ?? L.t("Playlist", context: "source")
+        case .single: return L.t("One Video", context: "source")
+        }
     }
 
     static func waitText(_ wait: StreamPolicy.Wait) -> String {
