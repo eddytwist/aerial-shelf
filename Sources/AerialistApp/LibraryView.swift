@@ -406,9 +406,10 @@ struct RotationControl: View {
             }
             if model.isAppleShuffleOn || model.state.paused || model.streamTarget != nil { Divider() }
             Picker(L.t("Rotate"), selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
-                Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
-                if model.state.streaming || model.state.mode == .allAerials {
+                if model.state.streaming {
                     Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
+                } else {
+                    Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
                 }
                 ForEach(model.state.playlists) { playlist in
                     Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id)))).tag(RotationMode.playlist(playlist.id))
@@ -421,6 +422,11 @@ struct RotationControl: View {
                 }
             }
             .pickerStyle(.inline)
+            if !model.state.streaming {
+                Section(L.t("Only downloaded videos rotate")) {
+                    Button(L.t("Rotate All Aerials Without Storing…")) { Task { await model.offerStreaming() } }
+                }
+            }
             if model.state.mode.rotates {
                 Picker(L.t("Change"), selection: Binding(get: { model.state.interval }, set: { model.state.interval = $0 })) {
                     ForEach(RotationInterval.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -428,10 +434,15 @@ struct RotationControl: View {
                 .pickerStyle(.inline)
             }
         } label: {
-            Label(model.statusLine, systemImage: model.state.paused ? "pause.circle" : "clock")
-                .labelStyle(.titleAndIcon)
+            // What rotates and when, so the section being browsed isn't mistaken for the rotation.
+            Label {
+                Text(verbatim: "\(model.sourceTitle) · \(model.statusLine)")
+            } icon: {
+                Image(systemName: model.state.paused ? "pause.circle" : "arrow.triangle.2.circlepath")
+            }
+            .labelStyle(.titleAndIcon)
         }
-        .help(L.t("Rotation"))
+        .help(L.t("What rotates and how often"))
     }
 }
 

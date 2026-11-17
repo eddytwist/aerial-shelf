@@ -142,7 +142,7 @@ extension AppModel {
         let goneSets = setsBefore.subtracting(custom.sets.map(\.id))
         let gonePlaylists = state.playlists.filter { $0.customSetID.map(goneSets.contains) ?? false }.map(\.id)
         state.playlists.removeAll { gonePlaylists.contains($0.id) }
-        if case .playlist(let id) = state.mode, gonePlaylists.contains(id) { state.mode = .allDownloaded }
+        if case .playlist(let id) = state.mode, gonePlaylists.contains(id) { state.mode = state.wholeLibraryMode }
         saveCustom()
         Task { await syncCustomCatalog() }
     }

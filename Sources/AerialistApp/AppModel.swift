@@ -93,6 +93,8 @@ final class AppModel {
         refresh()
         adoptReturnedCustomFiles()
         state.startScheduleIfNeeded()
+        // Version 0.3.0 could rotate "All Downloaded" with streaming on: only the one or two videos on disk.
+        state.normalizeSource()
         if !state.knownVideosSeeded {
             state.knownVideoIDs = Array(local.keys).sorted()
             state.knownVideosSeeded = true
@@ -158,6 +160,8 @@ final class AppModel {
         isReloadingState = false
         stateFileDate = date
         L.use(state.language)
+        // A file edited elsewhere (or a mode a newer version wrote) may pair streaming with All Downloaded.
+        state.normalizeSource()
     }
 
     /// The language the interface is in now (a choice of `system` resolved to `en` or `ru`).
@@ -479,7 +483,7 @@ final class AppModel {
     func deletePlaylist(_ playlistID: UUID) {
         customSetChanged(playlistID: playlistID, newName: nil)
         state.playlists.removeAll { $0.id == playlistID }
-        if state.mode == .playlist(playlistID) { state.mode = .allDownloaded }
+        if state.mode == .playlist(playlistID) { state.mode = state.wholeLibraryMode }
     }
 
     // MARK: Settings

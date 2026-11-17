@@ -22,7 +22,7 @@ public enum RotationMode: Codable, Hashable, Sendable {
     case playlist(UUID)
     /// One fixed video, no rotation.
     case single(String)
-    /// Random order over Apple's whole catalog (not the user's own videos). Meant for streaming: then each
+    /// Random order over Apple's whole catalog and the user's own videos. Meant for streaming: then each
     /// video is downloaded for its turn; without streaming it rotates the downloaded ones, like `allDownloaded`.
     case allAerials
 }
@@ -133,6 +133,20 @@ public struct RotationState: Codable, Equatable, Sendable {
         streamedIDs = read([String].self, .streamedIDs) ?? []
         streamedSizes = read([String: Int64].self, .streamedSizes) ?? [:]
         unreadableKeys = unreadable
+    }
+
+    /// The whole-library source for the current storage mode (see `RotationPolicy.source`).
+    public var wholeLibraryMode: RotationMode { RotationPolicy.source(.allDownloaded, streaming: streaming) }
+
+    /// Puts the source in step with the storage mode. A changed source starts a new round: the old one was drawn
+    /// from the few downloaded videos. Returns whether anything changed.
+    @discardableResult
+    public mutating func normalizeSource() -> Bool {
+        let source = RotationPolicy.source(mode, streaming: streaming)
+        guard source != mode else { return false }
+        mode = source
+        bag = []
+        return true
     }
 
     public func nextChange(after now: Date = Date()) -> Date? {

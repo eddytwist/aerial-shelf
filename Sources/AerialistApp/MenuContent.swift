@@ -34,9 +34,10 @@ struct MenuContent: View {
 
         Menu(L.t("Rotate: %@", modeTitle(model.state.mode))) {
             Picker(selection: Binding(get: { model.state.mode }, set: { mode in Task { await model.setMode(mode) } })) {
-                Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
-                if model.state.streaming || model.state.mode == .allAerials {
+                if model.state.streaming {
                     Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)
+                } else {
+                    Text(L.t("All Downloaded (%ld)", model.poolCount(for: .allDownloaded))).tag(RotationMode.allDownloaded)
                 }
                 ForEach(model.state.playlists) { playlist in
                     Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id))))
@@ -50,6 +51,11 @@ struct MenuContent: View {
                 }
             } label: { EmptyView() }
             .pickerStyle(.inline)
+            if !model.state.streaming {
+                Section(L.t("Only downloaded videos rotate")) {
+                    Button(L.t("Rotate All Aerials Without Storing…")) { Task { await model.offerStreaming() } }
+                }
+            }
         }
         if model.state.mode.rotates {
             Menu(model.state.interval.title) {

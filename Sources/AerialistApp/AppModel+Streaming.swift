@@ -1,5 +1,5 @@
 import AerialCore
-import Foundation
+import AppKit
 
 /// "Keep Only the Video on Screen" (`RotationState.streaming`): the rotation may include videos that aren't
 /// downloaded. Each one is downloaded right before its turn; the video on screen stays until the new one is
@@ -164,14 +164,53 @@ extension AppModel {
         streamWait = nil
         streamRetryAt = nil
         streamFailures = 0
-        guard !on else { return }
+        guard !on else {
+            // The video on screen stays; the next change already picks from the whole catalog.
+            state.normalizeSource()
+            return
+        }
         cancelStreamDownload()
         // Let a cancelled download finish unwinding before the last clean-up.
         for _ in 0..<20 where streamTarget != nil { try? await Task.sleep(for: .milliseconds(100)) }
         await pruneStreamed(now: true)
+        // Turned on again while this was waiting: leave the new choice alone.
+        guard !state.streaming else { return }
         refresh()
         if referencedIDs != nil { state.streamedIDs.removeAll { isInUse($0) } }
-        if state.mode == .allAerials { await setMode(.allDownloaded) }
+        let source = RotationPolicy.source(state.mode, streaming: false)
+        if source != state.mode { await setMode(source) }
+    }
+
+    /// The source the rotation picks from, for the toolbar and the menu.
+    var sourceTitle: String {
+        switch state.mode {
+        case .allDownloaded: L.t("All Downloaded", context: "source")
+        case .allAerials: L.t("All Aerials")
+        case .playlist(let id): state.playlists.first { $0.id == id }?.name ?? L.t("Playlist", context: "source")
+        case .single: L.t("One Video", context: "source")
+        }
+    }
+
+    /// "Rotate All Aerials…" when only downloaded videos rotate: explains the traffic, then turns on
+    /// Keep Only the Video on Screen, which makes All Aerials the source.
+    func offerStreaming() async {
+        let alert = NSAlert()
+        alert.messageText = L.t("Rotate all aerials without storing them?")
+        let month = Self.size(StreamPolicy.monthlyBytes(interval: state.interval), language: language)
+        alert.informativeText = L.t("Each video is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month; automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay. To stop, turn off Keep Only the Video on Screen in Settings → Storage.", month)
+        alert.addButton(withTitle: L.t("Turn On"))
+        alert.addButton(withTitle: L.t("Cancel"))
+        // A menu bar app isn't in front when its menu is used, and macOS may not let it activate:
+        // a floating alert still shows above other apps' windows.
+        NSApp.activate()
+        alert.window.level = .floating
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        await setStreaming(true)
+        // The button promised All Aerials, also from a playlist or a single video: a new round from it.
+        if state.mode != .allAerials {
+            state.bag = []
+            await setMode(.allAerials)
+        }
     }
 
     func isStreamed(_ id: String) -> Bool { state.streamedIDs.contains(id) }

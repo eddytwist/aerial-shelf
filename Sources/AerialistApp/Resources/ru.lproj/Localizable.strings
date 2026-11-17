@@ -97,7 +97,6 @@
 "Rotating now" = "Сейчас показывается";
 "Rotation off" = "Смена выключена";
 "Rotation will be paused." = "Смена обоев будет приостановлена.";
-"Rotation" = "Смена обоев";
 "Search" = "Поиск";
 "Set as Wallpaper" = "Сделать обоями";
 "Settings could not be read and were reset. The old file is in %@." = "Настройки не удалось прочитать, они сброшены. Старый файл сохранён: %@.";
@@ -211,3 +210,13 @@
 "Version %@ is available" = "Доступна версия %@";
 "Not checked yet" = "Проверок ещё не было";
 "Last checked: %@" = "Последняя проверка: %@";
+
+/* Rotation source (0.3.1). */
+"All Downloaded|source" = "Все загруженные";
+"One Video|source" = "Одно видео";
+"What rotates and how often" = "Что показывается и как часто";
+"Only downloaded videos rotate" = "Показываются только загруженные видео";
+"Rotate All Aerials Without Storing…" = "Показывать все аэрозаставки, не храня их…";
+"Rotate all aerials without storing them?" = "Показывать все аэрозаставки, не храня их?";
+"Playlist|source" = "Плейлист";
+"Each video is downloaded right before its turn, and the one it replaces is deleted. At your interval that’s about %@ a month; automatic changes wait while Low Data Mode or Low Power Mode is on. Videos you downloaded yourself stay. To stop, turn off Keep Only the Video on Screen in Settings → Storage." = "Каждое видео загружается перед своим показом, а видео, которое оно сменило, удаляется. С вашим интервалом это около %@ трафика в месяц; при экономии трафика и в режиме энергосбережения автоматическая смена ждёт. Видео, которые вы загрузили сами, остаются. Чтобы вернуть как было, выключите «Хранить только видео на экране» в Настройках → Хранилище.";

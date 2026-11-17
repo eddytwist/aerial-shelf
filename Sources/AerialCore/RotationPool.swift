@@ -11,7 +11,8 @@ public enum RotationPool {
         case .allDownloaded:
             wanted = Array(local.keys)
         case .allAerials:
-            wanted = catalog.videoAssets.filter { !$0.isCustom }.map(\.id)
+            // The user's own videos rotate with Apple's, as they do in All Downloaded.
+            wanted = catalog.videoAssets.map(\.id)
         case .playlist(let id):
             wanted = playlists.first { $0.id == id }?.assetIDs ?? []
         case .single(let id):
