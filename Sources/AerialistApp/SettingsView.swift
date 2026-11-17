@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    private let updater = Updater.shared
     @ViewState private var askingRestore = false
     @ViewState private var askingTrashKept = false
 
@@ -21,6 +22,19 @@ struct SettingsView: View {
                 if model.loginItemStatus == .requiresApproval {
                     LabeledContent(L.t("Needs approval in System Settings")) {
                         Button(L.t("Open")) { model.openLoginItemsSettings() }
+                    }
+                }
+            }
+
+            if updater.isAvailable {
+                Section(L.t("Updates")) {
+                    Toggle(isOn: Binding(get: { updater.automaticallyChecks }, set: { updater.setAutomaticallyChecks($0) })) {
+                        Text(L.t("Check for Updates Automatically"))
+                        Text(L.t("Once a day, Aerialist asks GitHub for a newer version."))
+                    }
+                    LabeledContent(updateStatusText) {
+                        Button(updater.buttonTitle) { updater.checkForUpdates() }
+                            .disabled(!updater.canCheckForUpdates)
                     }
                 }
             }
@@ -105,6 +119,7 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             model.refresh()
+            updater.refreshLastCheckDate()
             SettingsWindowTitle.apply()
             SettingsOpener.bringToFront()
         }
@@ -124,6 +139,15 @@ struct SettingsView: View {
         .alert(model.windowError ?? "", isPresented: Binding(get: { model.windowError != nil }, set: { if !$0 { model.windowError = nil } })) {
             Button(L.t("OK"), role: .cancel) { model.windowError = nil }
         }
+    }
+
+    private var updateStatusText: String {
+        if updater.updateAvailable, let version = updater.availableVersion {
+            return L.t("Version %@ is available", version)
+        }
+        guard let date = updater.lastCheckDate else { return L.t("Not checked yet") }
+        let formatted = date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: model.language)))
+        return L.t("Last checked: %@", formatted)
     }
 
     private var keptBytes: Int64 { model.keptVideosToTrash.reduce(0) { $0 + $1.size } }

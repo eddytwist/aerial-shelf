@@ -64,7 +64,8 @@ Free, for macOS 26 Tahoe or later.</p>
 3. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You do this once.
 4. The library opens and a mountain appears in the menu bar.
 
-Step 3 is there because the app isn't notarized by Apple yet.
+Step 3 is there because the app isn't notarized by Apple yet. Updates install from inside the app, so you do
+this only once.
 
 **Requirements:** macOS 26 Tahoe or later, Apple Silicon or Intel. App in English and Russian.
 
@@ -83,7 +84,8 @@ wallpaper and screen saver built into macOS and decides which videos they show.
 
 macOS keeps the wallpaper choice in a settings file. Aerialist writes one video ID into it and restarts the
 wallpaper service, so the desktop may flicker for a moment. Every change is backed up, read back and checked, and the
-previous settings come back if macOS doesn't accept it. Downloads come only from Apple's servers.
+previous settings come back if macOS doesn't accept it. Videos come only from Apple's servers, and app updates only
+from this repository's GitHub releases.
 
 </details>
 
@@ -185,8 +187,17 @@ killall WallpaperAerialsExtension
 
 ## Privacy
 
-No accounts, no analytics. The app goes online only to Apple's servers: when you click Download, and, with Keep Only
-the Video on Screen on, to download the next video before each change. The aerial
+No accounts, no analytics. The app goes online for two things:
+
+- **Videos, from Apple's servers:** when you click Download, and, with Keep Only the Video on Screen on, to download
+  the next video before each change.
+- **Updates, from GitHub:** at first launch and then once a day it downloads a small file from this repository's
+  latest release to see if there's a newer version. Nothing pops up: the menu and Settings offer **Update to …**,
+  and only when you click it does the app download the new version from the same place. It sends nothing else;
+  like any download, GitHub sees your IP address and the app's name and version. Turn the daily check off in
+  Settings → Updates, or check by hand with **Check for Updates…**.
+
+Every update is signed: the app installs it only if the signature matches the key built into it. The aerial
 videos, their names and previews belong to Apple; Aerialist doesn't include or redistribute them and isn't
 affiliated with Apple.
 
@@ -203,7 +214,8 @@ git clone https://github.com/eddytwist/aerialist.git && cd aerialist && scripts/
 scripts/test.sh
 ```
 
-`scripts/build-app.sh --universal --dmg` makes the release disk image. `aerialctl` is a command line tool on the same
+`scripts/build-app.sh --universal --dmg` makes a disk image; `scripts/release.sh` also signs it and writes the update
+feed, which needs the maintainer's update signing key. `aerialctl` is a command line tool on the same
 core (`swift run aerialctl status`); its `next` switches only to downloaded videos, and it also has `custom off`, which puts macOS back on Apple's catalog if the app was
 removed with My Videos on.
 

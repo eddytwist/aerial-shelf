@@ -13,7 +13,7 @@ struct AerialistApp: App {
                 .environment(model)
                 .onAppear { delegate.model = model }
         } label: {
-            MenuBarLabel(attention: model.needsAttention)
+            MenuBarLabel(attention: model.needsAttention || Updater.shared.updateAvailable)
                 .onAppear { delegate.model = model }
         }
         .menuBarExtraStyle(.menu)
@@ -45,6 +45,11 @@ struct AerialistApp: App {
 /// Handles reopening from Finder/Spotlight (shows the library) and quitting during downloads.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor var model: AppModel?
+
+    @MainActor
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Updater.shared.start()
+    }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { Task { @MainActor in LibraryOpener.open() } }

@@ -9,6 +9,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 source scripts/app.config
+# For testing updates: VERSION_OVERRIDE, BUILD_OVERRIDE, BUNDLE_ID_OVERRIDE and FEED_URL_OVERRIDE build
+# another version that reads another feed. scripts/release.sh refuses them unless run with --test.
+VERSION="${VERSION_OVERRIDE:-$VERSION}"
+BUILD="${BUILD_OVERRIDE:-$BUILD}"
+BUNDLE_ID="${BUNDLE_ID_OVERRIDE:-$BUNDLE_ID}"
+FEED_URL="${FEED_URL_OVERRIDE:-$FEED_URL}"
 
 CONFIG="release"
 INSTALL=0
@@ -38,8 +44,13 @@ fi
 
 APP="build/${APP_NAME}.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$EXECUTABLE" "$APP/Contents/MacOS/${APP_NAME}"
+# Sparkle (in-app updates) ships as a universal framework; SwiftPM leaves it next to the binary.
+ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+if ! otool -l "$APP/Contents/MacOS/${APP_NAME}" | grep -q "path @executable_path/../Frameworks "; then
+  install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/${APP_NAME}"
+fi
 cp -R Sources/AerialistApp/Resources/*.lproj "$APP/Contents/Resources/"
 if [[ -f Resources/AppIcon.icns ]]; then cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"; fi
 
@@ -62,6 +73,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHumanReadableCopyright</key><string>${COPYRIGHT}</string>
+  <key>SUFeedURL</key><string>${FEED_URL}</string>
+  <key>SUPublicEDKey</key><string>${SPARKLE_PUBLIC_KEY}</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>86400</integer>
+  <key>SURequireSignedFeed</key><true/>
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>
+  <key>SUAllowsAutomaticUpdates</key><false/>
 </dict>
 </plist>
 PLIST

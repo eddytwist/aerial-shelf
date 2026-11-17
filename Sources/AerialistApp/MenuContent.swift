@@ -85,6 +85,12 @@ struct MenuContent: View {
             .keyboardShortcut("l")
         Button(L.t("Settings…")) { SettingsOpener.open() }
             .keyboardShortcut(",")
+        if Updater.shared.isAvailable {
+            Button(Updater.shared.buttonTitle) {
+                Updater.shared.checkForUpdates()
+            }
+            .disabled(!Updater.shared.canCheckForUpdates)
+        }
 
         Divider()
 

@@ -201,3 +201,13 @@
 "Downloading “%@” · %ld%%" = "Загрузка «%@» · %ld %%";
 "Downloads it now and deletes it after its turn" = "Загружает видео сейчас и удаляет после показа";
 "Keeps this video after its turn instead of deleting it" = "Оставляет видео после показа, не удаляя";
+
+/* Updates (Sparkle). */
+"Updates" = "Обновления";
+"Check for Updates Automatically" = "Автоматически проверять обновления";
+"Once a day, Aerialist asks GitHub for a newer version." = "Раз в день Aerialist проверяет на GitHub, нет ли новой версии.";
+"Check for Updates…" = "Проверить обновления…";
+"Update to %@…" = "Обновить до %@…";
+"Version %@ is available" = "Доступна версия %@";
+"Not checked yet" = "Проверок ещё не было";
+"Last checked: %@" = "Последняя проверка: %@";

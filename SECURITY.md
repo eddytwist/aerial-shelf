@@ -19,4 +19,11 @@ Only the latest release gets fixes.
   Trash, and only when you ask.
 - With My Videos on, it sets two preference keys in `com.apple.wallpaper.aerial` that point macOS at a local copy of
   Apple's catalog. Turning My Videos off removes them.
+- At first launch, then once a day, and when you click **Check for Updates…**, it downloads `appcast.xml` from the
+  latest GitHub release of this repository to see if there's a newer version. You can turn the daily check off in
+  Settings → Updates. If you choose to install an update, it downloads the new disk image from the same release,
+  checks its EdDSA signature against the public key inside the app, replaces the app and opens it again. The feed
+  is signed too. Update checks don't wait for Low Data Mode. Updates use [Sparkle](https://sparkle-project.org),
+  which keeps its settings (keys starting with `SU`) in the app's preferences and a download cache in
+  `~/Library/Caches/com.eddytwist.Aerialist`.
 - No accounts, no analytics, no other network access.
