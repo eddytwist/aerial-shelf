@@ -223,4 +223,4 @@ removed with My Videos on.
 
 ## License
 
-[MIT](LICENSE) © 2026 Eduard Ivanov · [eddytwist.com](https://eddytwist.com)
+[MIT](LICENSE) © 2026 [eddytwist](https://eddytwist.com)
