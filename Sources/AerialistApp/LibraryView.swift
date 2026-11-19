@@ -42,6 +42,9 @@ struct LibraryView: View {
                                 .disabled(model.importStatus != nil)
                         }
                     }
+                    if let ids = batchIDs {
+                        ToolbarItem(placement: .primaryAction) { AddAllMenu(ids: ids, currentPlaylist: selectedPlaylistID) }
+                    }
                     ToolbarItem(placement: .primaryAction) { RotationControl() }
                     ToolbarItem(placement: .primaryAction) {
                         Button {
@@ -70,7 +73,7 @@ struct LibraryView: View {
             RenameSheet(title: L.t("Rename Playlist"), name: $newName) { model.rename(playlist.id, to: $0) }
         }
         .confirmationDialog(
-            L.t("Delete “%@”?", deleting?.name ?? ""),
+            L.t("Delete “%@”?", deleting.map(model.playlistName) ?? ""),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
         ) {
             Button(L.t("Delete Playlist"), role: .destructive) {
@@ -125,6 +128,10 @@ struct LibraryView: View {
                         .tag(SidebarItem.category(category.id))
                         .contextMenu {
                             Button(L.t("Rotate This Category")) { Task { await model.setMode(.category(category.id)) } }
+                            Button(L.t("Add All to My Aerials")) {
+                                model.add(model.catalog?.videoAssets.filter { $0.categoryIDs.contains(category.id) }.map(\.id) ?? [],
+                                          to: Playlist.myAerialsID)
+                            }
                         }
                 }
             } header: {
@@ -132,7 +139,7 @@ struct LibraryView: View {
             }
             Section {
                 ForEach(model.otherPlaylists) { playlist in
-                    row(playlist.name, "list.bullet.rectangle.fill", count: playlist.assetIDs.count,
+                    row(model.playlistName(playlist), "list.bullet.rectangle.fill", count: playlist.assetIDs.count,
                         rotating: model.state.mode == .playlist(playlist.id))
                         .tag(SidebarItem.playlist(playlist.id))
                         .dropDestination(for: String.self) { ids, _ in
@@ -141,7 +148,7 @@ struct LibraryView: View {
                         }
                         .contextMenu {
                             Button(L.t("Rotate This Playlist")) { Task { await model.setMode(.playlist(playlist.id)) } }
-                            Button(L.t("Rename…")) { newName = playlist.name; renaming = playlist }
+                            Button(L.t("Rename…")) { newName = model.playlistName(playlist); renaming = playlist }
                             Divider()
                             Button(L.t("Delete Playlist…"), role: .destructive) { deleting = playlist }
                         }
@@ -155,7 +162,7 @@ struct LibraryView: View {
                 Button {
                     let playlist = model.createPlaylist(named: L.t("New Playlist"))
                     selection = .playlist(playlist.id)
-                    newName = playlist.name
+                    newName = model.playlistName(playlist)
                     renaming = playlist
                 } label: {
                     Label(L.t("New Playlist"), systemImage: "plus")
@@ -352,6 +359,13 @@ struct LibraryView: View {
         }
     }
 
+    /// What "Add All" adds: the videos shown in this section (after search), anywhere but My Aerials itself.
+    private var batchIDs: [String]? {
+        guard selectedPlaylistID != Playlist.myAerialsID, model.catalog != nil else { return nil }
+        let ids = visibleAssets.map(\.id)
+        return ids.isEmpty ? nil : ids
+    }
+
     private var selectedPlaylistID: UUID? {
         if case .playlist(let id) = selection { return id }
         return nil
@@ -436,6 +450,51 @@ struct RotationControl: View {
     }
 }
 
+/// "Add All" in the toolbar: every video shown in the section goes into My Aerials or a playlist at once.
+struct AddAllMenu: View {
+    @Environment(AppModel.self) private var model
+    let ids: [String]
+    var currentPlaylist: UUID?
+
+    var body: some View {
+        Menu {
+            AddToListsItems(ids: ids, currentPlaylist: currentPlaylist)
+        } label: {
+            Label(L.t("Add All"), systemImage: "heart.text.square")
+        }
+        .help(L.t("Add every video shown here to My Aerials or a playlist"))
+    }
+}
+
+/// Add these videos to My Aerials / remove them, or add them to another playlist. Shared by "Add All" and the
+/// context menu of several selected videos.
+struct AddToListsItems: View {
+    @Environment(AppModel.self) private var model
+    let ids: [String]
+    /// The playlist being shown, left out of "Add to Playlist".
+    var currentPlaylist: UUID?
+
+    var body: some View {
+        let missing = ids.filter { !model.isInMyAerials($0) }
+        if !missing.isEmpty {
+            Button(L.t("Add %@ to My Aerials", L.videos(missing.count))) { model.add(missing, to: Playlist.myAerialsID) }
+        }
+        if missing.count < ids.count {
+            Button(L.t("Remove %@ from My Aerials", L.videos(ids.count - missing.count))) {
+                ids.forEach { model.remove($0, from: Playlist.myAerialsID) }
+            }
+        }
+        let others = model.otherPlaylists.filter { $0.id != currentPlaylist }
+        Menu(L.t("Add to Playlist")) {
+            ForEach(others) { playlist in
+                Button(model.playlistName(playlist)) { model.add(ids, to: playlist.id) }
+            }
+            if !others.isEmpty { Divider() }
+            Button(L.t("New Playlist")) { model.createPlaylist(named: L.t("New Playlist"), with: ids) }
+        }
+    }
+}
+
 /// Grid of video tiles. Like Finder, the grid takes keyboard focus as a whole: arrow keys move the selection,
 /// Space opens Quick Look, Return sets the selected video (downloading it first if needed), ⌘⌫ removes it from this Mac,
 /// Escape clears the selection.
@@ -448,6 +507,8 @@ struct VideoGrid: View {
     /// Lets the library take the keyboard away from the sidebar when a video is clicked.
     var releaseSidebar: () -> Void = {}
     @ViewState private var selectedID: String?
+    /// Several videos chosen with ⌘-click, ⇧-click or ⌘A; their context menu acts on all of them.
+    @ViewState private var chosen: Set<String> = []
     @ViewState private var columnCount = 3
     @ViewState private var activations = 0
     @ViewState private var trashRequests = 0
@@ -467,20 +528,17 @@ struct VideoGrid: View {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
                     ForEach(assets) { asset in
                         let selected = selectedID == asset.id
+                        let marked = chosen.contains(asset.id)
+                        let several = chosen.count > 1 && marked
                         VideoTile(
                             asset: asset,
                             playlistID: playlistID,
-                            isSelected: selected,
-                            showsFocus: selected && focused && usingKeyboard && windowState == .key,
+                            isSelected: selected || several,
+                            showsFocus: marked || (selected && focused && usingKeyboard && windowState == .key),
+                            selection: several ? assets.map(\.id).filter(chosen.contains) : nil,
                             activateRequest: selected ? activations : nil,
                             trashRequest: selected ? trashRequests : nil,
-                            select: {
-                                selectedID = asset.id
-                                usingKeyboard = false
-                                // After the click is handled, or the sidebar keeps the keyboard.
-                                releaseSidebar()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { focused = true }
-                            },
+                            select: { choose(asset.id) },
                             preview: { preview(asset.id) }
                         )
                         .id(asset.id)
@@ -502,24 +560,25 @@ struct VideoGrid: View {
             .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
                 guard let next = neighbour(of: press.key) else { return .ignored }
                 selectedID = next
+                chosen = []
                 usingKeyboard = true
                 withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(next) }
                 return .handled
             }
             .onKeyPress(.return) {
                 // Keys act on the selection only while it is visible (after an arrow key), never on a hidden one.
-                guard selectedID != nil, usingKeyboard else { return .ignored }
+                guard selectedID != nil, usingKeyboard, chosen.count < 2 else { return .ignored }
                 activations += 1
                 return .handled
             }
             .onKeyPress(keys: [.delete]) { press in
                 // ⌘⌫ moves the selected video to the Trash, as in Finder (with the usual confirmation).
-                guard press.modifiers.contains(.command), usingKeyboard, let id = selectedID, model.isDownloaded(id) else { return .ignored }
+                guard press.modifiers.contains(.command), usingKeyboard, chosen.count < 2, let id = selectedID, model.isDownloaded(id) else { return .ignored }
                 trashRequests += 1
                 return .handled
             }
             .onKeyPress(.space) {
-                guard usingKeyboard, let id = selectedID, model.isDownloaded(id) else { return .ignored }
+                guard usingKeyboard, chosen.count < 2, let id = selectedID, model.isDownloaded(id) else { return .ignored }
                 preview(id)
                 return .handled
             }
@@ -527,9 +586,63 @@ struct VideoGrid: View {
             .onChange(of: previewURL) { if previewURL == nil { model.removePreviewLinks() } }
             .onKeyPress(.escape) {
                 selectedID = nil
+                chosen = []
                 return .handled
             }
+            .onKeyPress(characters: ["a"]) { press in
+                guard press.modifiers.contains(.command) else { return .ignored }
+                selectAll()
+                return .handled
+            }
+            // In the Dock (while a window is open) the app has an Edit menu whose Select All also sends ⌘A.
+            .onCommand(#selector(NSResponder.selectAll(_:))) { selectAll() }
+            // Sections and searches share this grid: keep only what is still shown.
+            .onChange(of: assets.map(\.id)) { _, ids in
+                chosen.formIntersection(ids)
+                if let id = selectedID, !ids.contains(id) { selectedID = nil }
+            }
         }
+    }
+
+    /// A click on a tile: plain selects it alone, ⌘ adds or removes it, ⇧ selects the range from the last plain click.
+    /// Returns true for a plain click, which may then do the tile's own action (Quick Look).
+    private func choose(_ id: String) -> Bool {
+        let flags = NSEvent.modifierFlags
+        usingKeyboard = false
+        defer {
+            // After the click is handled, or the sidebar keeps the keyboard.
+            releaseSidebar()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { focused = true }
+        }
+        if flags.contains(.command) {
+            if chosen.isEmpty, let current = selectedID { chosen = [current] }
+            if chosen.contains(id) {
+                chosen.remove(id)
+                selectedID = assets.first { chosen.contains($0.id) }?.id
+            } else {
+                chosen.insert(id)
+                selectedID = id
+            }
+            return false
+        }
+        if flags.contains(.shift) {
+            if let anchor = selectedID, let from = assets.firstIndex(where: { $0.id == anchor }),
+               let to = assets.firstIndex(where: { $0.id == id }) {
+                chosen = Set(assets[min(from, to)...max(from, to)].map(\.id))
+            } else {
+                chosen = [id]
+                selectedID = id
+            }
+            return false
+        }
+        chosen = []
+        selectedID = id
+        return true
+    }
+
+    private func selectAll() {
+        chosen = Set(assets.map(\.id))
+        usingKeyboard = false
     }
 
     /// Opens Quick Look on a video; the arrow keys there move through the downloaded videos in grid order.

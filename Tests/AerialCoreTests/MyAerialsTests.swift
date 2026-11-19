@@ -225,3 +225,27 @@ private func onDisk(_ ids: String...) -> [String: LocalVideo] {
         #expect(state.lastShown(keep: 3) == ["a", "own", "b"])
     }
 }
+
+@Suite struct LoginItemStateTests {
+    @Test func openAtLoginIsTurnedOnOnceAndAChoiceIsRemembered() throws {
+        var state = RotationState()
+        #expect(!state.loginItemChosen && !state.loginItemTurnedOnByApp)
+        state.loginItemTurnedOnByApp = true
+        state.loginItemChosen = true
+        let decoded = try JSONDecoder.iso.decode(RotationState.self, from: JSONEncoder.iso.encode(state))
+        #expect(decoded.loginItemTurnedOnByApp && decoded.loginItemChosen)
+        let old = try JSONDecoder.iso.decode(RotationState.self, from: Data("{}".utf8))
+        #expect(!old.loginItemChosen && !old.loginItemTurnedOnByApp)
+    }
+}
+
+@Suite struct LoginItemPolicyTests {
+    @Test func aNewInstallTurnsItOnAnUpdateOnlyOffersIt() {
+        #expect(RotationPolicy.loginItem(isFirstLaunch: true, chosen: false, handled: false, isOn: false) == .turnOn)
+        // Off after an update may be the user's choice from an earlier version: ask, don't override.
+        #expect(RotationPolicy.loginItem(isFirstLaunch: false, chosen: false, handled: false, isOn: false) == .offer)
+        #expect(RotationPolicy.loginItem(isFirstLaunch: false, chosen: false, handled: false, isOn: true) == .nothing)
+        #expect(RotationPolicy.loginItem(isFirstLaunch: false, chosen: true, handled: false, isOn: false) == .nothing)
+        #expect(RotationPolicy.loginItem(isFirstLaunch: true, chosen: false, handled: true, isOn: false) == .nothing)
+    }
+}

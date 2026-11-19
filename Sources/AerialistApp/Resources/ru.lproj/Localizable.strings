@@ -230,3 +230,11 @@
 "Videos you downloaded earlier go to the Trash." = "Видео, которые вы загружали раньше, уйдут в Корзину.";
 "Videos you keep on this Mac don’t count. Without the network, videos already on this Mac rotate." = "Видео, оставленные на этом Mac, не считаются. Без сети показываются видео, которые уже на этом Mac.";
 "Add videos from any section with ＋ on a tile, or drag them here." = "Добавляйте видео из любого раздела кнопкой ＋ на плитке или перетаскивайте сюда.";
+"%@ selected" = "Выбрано: %@";
+"Add %@ to My Aerials" = "Добавить в «Мои заставки»: %@";
+"Add All" = "Добавить все";
+"Add All to My Aerials" = "Добавить все в «Мои заставки»";
+"Add every video shown here to My Aerials or a playlist" = "Добавить все показанные видео в «Мои заставки» или в плейлист";
+"Remove %@ from My Aerials" = "Убрать из «Моих заставок»: %@";
+"Open Aerialist at Login?" = "Открывать Aerialist при входе?";
+"Not Now" = "Не сейчас";

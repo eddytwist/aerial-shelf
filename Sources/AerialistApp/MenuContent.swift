@@ -51,7 +51,7 @@ struct MenuContent: View {
             }
         }
 
-        if !model.unexpected.isEmpty || model.notice != nil {
+        if !model.unexpected.isEmpty || model.notice != nil || model.offersLoginItem {
             Divider()
         }
         ForEach(model.unexpected, id: \.assetID) { video in
@@ -59,6 +59,12 @@ struct MenuContent: View {
                 Text(AppModel.size(video.size, language: model.language))
                 Button(L.t("Move to Trash")) { model.trashUnexpected(video.assetID) }
                 Button(L.t("Keep in Library")) { model.keepUnexpected(video.assetID) }
+            }
+        }
+        if model.offersLoginItem {
+            Menu(L.t("Open Aerialist at Login?")) {
+                Button(L.t("Open at Login")) { model.answerLoginItemOffer(true) }
+                Button(L.t("Not Now")) { model.answerLoginItemOffer(false) }
             }
         }
         if let notice = model.notice {
@@ -112,7 +118,7 @@ struct RotationSourcePicker: View {
             Text(L.t("%@ (%ld)", L.t("My Aerials"), model.poolCount(for: RotationState.myAerialsMode)))
                 .tag(RotationState.myAerialsMode)
             ForEach(model.otherPlaylists) { playlist in
-                Text(L.t("%@ (%ld)", playlist.name, model.poolCount(for: .playlist(playlist.id))))
+                Text(L.t("%@ (%ld)", model.playlistName(playlist), model.poolCount(for: .playlist(playlist.id))))
                     .tag(RotationMode.playlist(playlist.id))
             }
             Text(L.t("All Aerials (%ld)", model.poolCount(for: .allAerials))).tag(RotationMode.allAerials)

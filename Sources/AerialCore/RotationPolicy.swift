@@ -85,6 +85,20 @@ public enum RotationPolicy {
         return id == current || referenced.contains(id)
     }
 
+    /// What to do about Open at Login at launch.
+    public enum LoginItemAction: Equatable, Sendable {
+        /// A new install: turn it on (macOS shows its own "Login item added" notification).
+        case turnOn
+        /// An update from a version that didn't record a choice: it may be off on purpose, so only offer it once.
+        case offer
+        case nothing
+    }
+
+    public static func loginItem(isFirstLaunch: Bool, chosen: Bool, handled: Bool, isOn: Bool) -> LoginItemAction {
+        if chosen || handled || isOn { return .nothing }
+        return isFirstLaunch ? .turnOn : .offer
+    }
+
     /// A failed change pauses rotation: retrying every minute would restart the wallpaper service again and again.
     public static let pausesAfterFailedChange = true
 }

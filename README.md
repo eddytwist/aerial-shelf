@@ -23,7 +23,7 @@ Free, for macOS 26 Tahoe or later.</p>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/category-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/category-light.png">
-  <img alt="Aerialist library: a category with downloaded videos first and a download button on the rest" src="docs/screenshots/category-light.png" width="860">
+  <img alt="Aerialist library: the Landscape category, with a heart on the videos in My Aerials" src="docs/screenshots/category-light.png" width="860">
 </picture>
 
 </div>
@@ -42,15 +42,15 @@ Free, for macOS 26 Tahoe or later.</p>
 <table>
   <tr>
     <td width="38%" align="center">
-      <img alt="The menu bar menu: video on screen, next change, Next Video, Pause Rotation, what to rotate and how often" src="docs/screenshots/menu.png" width="260">
+      <img alt="The menu bar menu: video on screen, next change, Next Video, Pause Rotation, Add to My Aerials, what to rotate and how often" src="docs/screenshots/menu.png" width="260">
       <p><sub>Everything from the menu bar</sub></p>
     </td>
     <td width="62%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/library-dark.png">
-        <img alt="A playlist of aerials, rotating now" src="docs/screenshots/library-light.png">
+        <img alt="My Aerials, rotating now" src="docs/screenshots/library-light.png">
       </picture>
-      <p><sub>Make a playlist to rotate</sub></p>
+      <p><sub>Pick your favorites into My Aerials</sub></p>
     </td>
   </tr>
 </table>

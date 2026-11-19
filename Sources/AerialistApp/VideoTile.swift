@@ -8,13 +8,16 @@ struct VideoTile: View {
     let asset: AerialAsset
     let playlistID: UUID?
     let isSelected: Bool
-    /// True when the grid has keyboard focus and this is the selected video.
+    /// True when the grid has keyboard focus and this is the selected video, or it is one of several chosen.
     let showsFocus: Bool
+    /// All the chosen videos when this one is among several (⌘/⇧-click); the context menu then acts on all of them.
+    let selection: [String]?
     /// Grows each time Return is pressed in the grid while this video is selected; nil when it isn't selected.
     let activateRequest: Int?
     /// Grows each time ⌘⌫ is pressed in the grid while this video is selected; nil when it isn't selected.
     let trashRequest: Int?
-    let select: () -> Void
+    /// Selects the tile; true for a plain click (no ⌘ or ⇧), which then does the tile's own action.
+    let select: () -> Bool
     /// Opens Quick Look for a downloaded video.
     let preview: () -> Void
 
@@ -54,7 +57,7 @@ struct VideoTile: View {
                 // A click on the picture plays a video that is on this Mac in Quick Look.
                 .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 // A single click only (no double-click), so Quick Look opens without waiting.
-                .onTapGesture { select(); pictureAction() }
+                .onTapGesture { if select() { pictureAction() } }
                 .help(pictureHelp)
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -98,7 +101,7 @@ struct VideoTile: View {
         }
         .contentShape(Rectangle())
         .onHover { inside in withAnimation(.easeOut(duration: 0.15)) { hovering = inside } }
-        .onTapGesture { select() }
+        .onTapGesture { _ = select() }
         .onChange(of: activateRequest) { old, new in
             if let old, let new, new > old { primaryAction() }
         }
@@ -249,6 +252,18 @@ struct VideoTile: View {
     }
 
     @ViewBuilder private var menu: some View {
+        if let selection {
+            Text(L.t("%@ selected", L.videos(selection.count)))
+            AddToListsItems(ids: selection, currentPlaylist: playlistID)
+            if let playlistID, playlistID != Playlist.myAerialsID {
+                Button(L.t("Remove from Playlist")) { selection.forEach { model.remove($0, from: playlistID) } }
+            }
+        } else {
+            singleMenu
+        }
+    }
+
+    @ViewBuilder private var singleMenu: some View {
         if missingCustomFile {
             Button(L.t("Remove from My Videos…")) { askingRemove = true }
         } else {
@@ -263,7 +278,7 @@ struct VideoTile: View {
             Button(inMyAerials ? L.t("Remove from My Aerials") : L.t("Add to My Aerials")) { model.toggleMyAerials(asset.id) }
             Menu(L.t("Add to Playlist")) {
                 ForEach(model.otherPlaylists) { playlist in
-                    Button(playlist.name) { model.add([asset.id], to: playlist.id) }
+                    Button(model.playlistName(playlist)) { model.add([asset.id], to: playlist.id) }
                         .disabled(playlist.assetIDs.contains(asset.id))
                 }
                 if !model.otherPlaylists.isEmpty { Divider() }
@@ -310,7 +325,7 @@ struct VideoTile: View {
     }
 
     private func primaryAction() {
-        select()
+        _ = select()
         if missingCustomFile { askingRemove = true; return }
         if canShow { show() } else if isDownloaded { preview() }
     }

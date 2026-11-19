@@ -58,6 +58,8 @@ final class AppModel {
     var streamFailures = 0
     /// A clean-up is deleting rotation copies under the switch lock: no change or Keep on This Mac starts meanwhile.
     var isPruning = false
+    /// The menu offers Open at Login once (after an update, when it is off and the user never chose).
+    var offersLoginItem = false
     /// init has finished (refresh then also runs the storage migration if the catalog wasn't readable at launch).
     private var didLaunch = false
     /// True when the app had never run before this launch; the library then opens by itself.
@@ -105,8 +107,21 @@ final class AppModel {
             state.knownVideosSeeded = true
         }
         detectUnexpected()
+        // Open at Login is on by default for new installs; after an update it is only offered once in the menu,
+        // because it may have been turned off on purpose.
+        switch RotationPolicy.loginItem(isFirstLaunch: isFirstLaunch, chosen: state.loginItemChosen,
+                                        handled: state.loginItemTurnedOnByApp, isOn: launchAtLogin) {
+        case .turnOn:
+            // Quietly: an unsigned build may be refused, and an alert at first launch would come out of nowhere.
+            try? SMAppService.mainApp.register()
+            loginItemStatus = SMAppService.mainApp.status
+            state.loginItemTurnedOnByApp = true
+        case .offer:
+            offersLoginItem = true
+        case .nothing:
+            break
+        }
         if isFirstLaunch {
-            if !launchAtLogin { launchAtLogin = true }
             if RotationPolicy.replacesAppleShuffleAtLaunch(isFirstLaunch: true, observation: isAppleShuffleOn ? .appleShuffle : .fine, poolCount: pool.count) {
                 Task { await self.replaceAppleShuffle() }
             }
@@ -568,7 +583,15 @@ final class AppModel {
         ).save(paths: paths)
     }
 
-    var needsAttention: Bool { !unexpected.isEmpty || notice != nil || isAppleShuffleOn }
+    var needsAttention: Bool { !unexpected.isEmpty || notice != nil || isAppleShuffleOn || offersLoginItem }
+
+    /// The answer to the one-time offer in the menu; either way it isn't offered again.
+    func answerLoginItemOffer(_ turnOn: Bool) {
+        if turnOn { launchAtLogin = true }
+        offersLoginItem = false
+        state.loginItemTurnedOnByApp = true
+        state.loginItemChosen = true
+    }
 
     // MARK: Messages
 

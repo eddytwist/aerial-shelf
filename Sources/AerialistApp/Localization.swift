@@ -37,6 +37,21 @@ enum L {
 
     static func t(_ key: String) -> String { table[key] ?? key }
 
+    /// A default name in every language the app has (English, and each translation), to tell it from one the user typed.
+    static func defaultNames(of key: String) -> Set<String> {
+        if let cached = defaultNamesCache[key] { return cached }
+        var names: Set<String> = [key]
+        for language in supported.map(\.code) where language != "en" {
+            if let url = Bundle.main.url(forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: language),
+               let dict = NSDictionary(contentsOf: url) as? [String: String], let name = dict[key] {
+                names.insert(name)
+            }
+        }
+        defaultNamesCache[key] = names
+        return names
+    }
+    private static var defaultNamesCache: [String: Set<String>] = [:]
+
     /// The same English text translated differently in another place: looks up `key|context` first.
     static func t(_ key: String, context: String) -> String { table["\(key)|\(context)"] ?? t(key) }
 

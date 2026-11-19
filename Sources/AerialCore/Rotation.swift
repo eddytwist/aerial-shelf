@@ -105,6 +105,11 @@ public struct RotationState: Codable, Equatable, Sendable {
     public static let shownLogLimit = 100
     /// 0 before 0.5; 1 once `StorageMigration` has set up My Aerials and the storage settings.
     public var storageVersion = 0
+    /// The user switched Open at Login on or off in Settings: the app never changes it by itself again.
+    public var loginItemChosen = false
+    /// Open at Login was turned on by the app on a new install, or offered once after an update (see
+    /// `RotationPolicy.loginItem`): the app doesn't do either again.
+    public var loginItemTurnedOnByApp = false
     /// Keys that were in the file but could not be read (not saved). `StateStore` keeps a copy of such a file.
     public var unreadableKeys: [String] = []
 
@@ -114,6 +119,7 @@ public struct RotationState: Codable, Equatable, Sendable {
         case mode, interval, paused, playlists, bag, lastChange, lastAssetID, knownVideoIDs, knownVideosSeeded
         case customVideosEnabled, streaming, streamedIDs, streamedSizes
         case deleteShown, keepLast, pinnedIDs, pinnedCopies, shownLog, storageVersion
+        case loginItemChosen, loginItemTurnedOnByApp
         case language = "uiLanguage"
     }
 
@@ -163,6 +169,8 @@ public struct RotationState: Codable, Equatable, Sendable {
         pinnedCopies = read([String].self, .pinnedCopies) ?? []
         shownLog = read([String].self, .shownLog) ?? []
         storageVersion = read(Int.self, .storageVersion) ?? 0
+        loginItemChosen = read(Bool.self, .loginItemChosen) ?? false
+        loginItemTurnedOnByApp = read(Bool.self, .loginItemTurnedOnByApp) ?? false
         unreadableKeys = unreadable
     }
 

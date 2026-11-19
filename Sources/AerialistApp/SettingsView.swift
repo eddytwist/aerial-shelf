@@ -17,7 +17,10 @@ struct SettingsView: View {
                         Text(language.name).tag(language.code)
                     }
                 }
-                Toggle(L.t("Open at Login"), isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
+                Toggle(L.t("Open at Login"), isOn: Binding(get: { model.launchAtLogin }, set: {
+                    model.launchAtLogin = $0
+                    model.state.loginItemChosen = true
+                }))
                 if model.loginItemStatus == .requiresApproval {
                     LabeledContent(L.t("Needs approval in System Settings")) {
                         Button(L.t("Open")) { model.openLoginItemsSettings() }

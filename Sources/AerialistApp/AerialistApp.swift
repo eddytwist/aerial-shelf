@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
         Updater.shared.start()
+        WindowPolicy.observe()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -76,6 +77,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// A menu bar app (LSUIElement) has no Dock icon and isn't in Cmd+Tab. While one of its windows is open (the library,
+/// Settings, the update window) it becomes a regular app, so it can be switched to like any other; when the last one
+/// closes it goes back to the menu bar only.
+@MainActor
+enum WindowPolicy {
+    static func observe() {
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.didDeminiaturizeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { _ in Task { @MainActor in update() } }
+        }
+        // A closing window is still visible while it closes: look again a moment later.
+        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { Task { @MainActor in update() } }
+        }
+        update()
+    }
+
+    /// True when a real window is open: titled, normal level, not a panel or alert; a minimized one counts.
+    static var hasOpenWindow: Bool {
+        NSApp.windows.contains { window in
+            (window.isVisible || window.isMiniaturized) && window.styleMask.contains(.titled)
+                && !(window is NSPanel) && window.level == .normal
+        }
+    }
+
+    static func update() {
+        let wanted: NSApplication.ActivationPolicy = hasOpenWindow ? .regular : .accessory
+        guard NSApp.activationPolicy() != wanted else { return }
+        NSApp.setActivationPolicy(wanted)
+        // Becoming a regular app doesn't bring it forward by itself. Going back, its menus could stay in the menu bar
+        // until another app is clicked: hiding hands the menu bar back to the app that was in front.
+        if wanted == .regular { NSApp.activate() } else if NSApp.isActive { NSApp.hide(nil) }
+    }
+}
+
 /// Opens the library window from places that have no SwiftUI environment.
 @MainActor
 enum LibraryOpener {
@@ -93,6 +129,8 @@ enum LibraryOpener {
                 guard let window = NSApp.windows.first(where: { $0.frame.width > 700 && $0.styleMask.contains(.titled) }) else { return }
                 window.makeKeyAndOrderFront(nil)
                 window.orderFrontRegardless()
+                // A window raised without activation never becomes key, so no notification comes.
+                WindowPolicy.update()
             }
         }
     }
@@ -120,6 +158,7 @@ enum SettingsOpener {
                 // macOS may refuse to activate the app (it allows that only right after the user acts on it);
                 // the window still comes in front of other apps' windows.
                 window.orderFrontRegardless()
+                WindowPolicy.update()
             }
         }
     }

@@ -320,7 +320,12 @@ extension AppModel {
     }
 
     /// A playlist's name in the interface: My Aerials in the app's language, the others as the user named them.
-    func playlistName(_ playlist: Playlist) -> String { playlist.isMyAerials ? L.t("My Aerials") : playlist.name }
+    /// A playlist still called "New Playlist" in any of the app's languages was never renamed: it follows the language.
+    func playlistName(_ playlist: Playlist) -> String {
+        if playlist.isMyAerials { return L.t("My Aerials") }
+        if L.defaultNames(of: "New Playlist").contains(playlist.name) { return L.t("New Playlist") }
+        return playlist.name
+    }
 
     /// The user's own playlists (not My Aerials), for the sidebar's Playlists section and Add to Playlist.
     var otherPlaylists: [Playlist] { state.playlists.filter { !$0.isMyAerials } }
